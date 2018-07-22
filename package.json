@@ -1,0 +1,22 @@
+{
+  "name": "spacemash",
+  "version": "0.0.1",
+  "description": "Multiplayer space warfare browser 3D game",
+  "scripts": {
+    "client-watch": "cd client&&webpack --watch",
+    "start-server": "cd server&&node main.js"
+  },
+  "author": "wiranoid",
+  "devDependencies": {
+    "@types/webgl2": "0.0.4",
+    "ts-loader": "^4.4.2",
+    "typescript": "^2.9.2",
+    "webpack": "^4.16.1",
+    "webpack-command": "^0.4.1"
+  },
+  "dependencies": {
+    "koa": "^2.5.2",
+    "koa-send": "^5.0.0",
+    "koa-static": "^5.0.0"
+  }
+}
