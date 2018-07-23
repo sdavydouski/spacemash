@@ -1,12 +1,22 @@
+import {mat4, vec3} from 'gl-matrix';
 import {getContext} from './gl';
 import {getResources} from './resources';
-import {createProgram, createShader, getUniformLocation, setShaderUniform} from './shaders';
-import {toRadians} from './math';
-import {FLOAT_SIZE_IN_BYTES} from './sizes';
+import {createProgram, createShader, getUniformLocation} from './shaders';
+import {clamp, toRadians} from './math';
+import {createCamera} from './camera';
+
+const pressedKeys: {
+    [key: string]: any;
+} = {};
 
 getResources().then(([[vertexShaderSource, fragmentShaderSource]]) => {
-    const canvas = <HTMLCanvasElement>document.getElementById('glCanvas');
+    const canvas = <HTMLCanvasElement>document.getElementById('game-surface');
     const gl = getContext(canvas);
+
+    const uiPanel = <HTMLDivElement>document.getElementById('ui-panel');
+
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
 
     const onResize = () => {
         const screenWidth = window.innerWidth;
@@ -26,17 +36,36 @@ getResources().then(([[vertexShaderSource, fragmentShaderSource]]) => {
 
     gl.useProgram(shaderProgram);
 
-    const pointSizeUniformLocation = getUniformLocation(gl, shaderProgram, 'pointSize');
-    setShaderUniform(gl, pointSizeUniformLocation, 50);
-    const angleUniformLocation = getUniformLocation(gl, shaderProgram, 'angle');
+    const modelUniformLocation = getUniformLocation(gl, shaderProgram, 'model');
+    const model = mat4.create();
+    gl.uniformMatrix4fv(modelUniformLocation, false, model);
 
-    const vertices = new Float32Array([
-        0, 0, 0, 0,
-        0.5, 0.5, 0, toRadians(0),
-        0.5, -0.5, 0, toRadians(90),
-        -0.5, -0.5, 0, toRadians(180),
-        -0.5, 0.5, 0, toRadians(270)
-    ]);
+    const viewUniformLocation = getUniformLocation(gl, shaderProgram, 'view');
+    const view = mat4.create();
+
+    const projectionUniformLocation = getUniformLocation(gl, shaderProgram, 'projection');
+    const projection = mat4.create();
+    let fov = 45;
+
+    const camera = createCamera();
+
+    const magic = 10;
+    const LINES_PER_AXIS = 100;
+    const offsetX = 2 * magic / (LINES_PER_AXIS - 1);
+    const offsetZ = 2 * magic / (LINES_PER_AXIS - 1);
+
+    let grid: number[] = [];
+
+    for (let x = -magic; x <= magic; x += offsetX) {
+        grid.push(x, 0, -magic);
+        grid.push(x, 0, magic);
+    }
+    for (let z = -magic; z <= magic; z += offsetZ) {
+        grid.push(-magic, 0, z);
+        grid.push(magic, 0, z);
+    }
+
+    const vertices = new Float32Array(grid);
 
     const VAO = gl.createVertexArray();
     gl.bindVertexArray(VAO);
@@ -46,12 +75,7 @@ getResources().then(([[vertexShaderSource, fragmentShaderSource]]) => {
     gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
-        4 * FLOAT_SIZE_IN_BYTES, 0);
-
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 1, gl.FLOAT, false,
-        4 * FLOAT_SIZE_IN_BYTES, 3 * FLOAT_SIZE_IN_BYTES);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,0, 0);
 
     let lastTime = 0;
     function gameLoop() {
@@ -59,26 +83,106 @@ getResources().then(([[vertexShaderSource, fragmentShaderSource]]) => {
         const delta = (currentTime - lastTime) / 1000;
         lastTime = currentTime;
 
+        input(delta);
         render(delta);
 
         window.requestAnimationFrame(gameLoop);
     }
 
-    let angle = toRadians(-90);
-
     gl.clearColor(0, 0, 0, 1);
     function render(delta: number) {
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        angle += toRadians(90) * delta;
-        angle %= 2 * Math.PI;
-        setShaderUniform(gl, angleUniformLocation, angle);
+        gl.useProgram(shaderProgram);
+
+        mat4.perspective(projection, toRadians(fov), screenWidth / screenHeight, 0.1, 100);
+        gl.uniformMatrix4fv(projectionUniformLocation, false, projection);
+
+        camera.updateViewMatrix(view);
+        gl.uniformMatrix4fv(viewUniformLocation, false, view);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, VBO);
-        gl.useProgram(shaderProgram);
-        gl.drawArrays(gl.POINTS, 0, 5);
+        gl.drawArrays(gl.LINES, 0, grid.length / 3);
+
+        updateUI();
     }
 
     gameLoop();
+
+    function input(delta: number) {
+        const speed = 2.5 * delta;
+
+        if (pressedKeys.w) {
+            camera.moveForward(speed);
+        }
+        if (pressedKeys.s) {
+            camera.moveBackward(speed);
+        }
+        if (pressedKeys.a) {
+            camera.strafeLeft(speed);
+        }
+        if (pressedKeys.d) {
+            camera.strafeRight(speed);
+        }
+    }
+
+    function updateUI() {
+        uiPanel.innerHTML = `
+            <span>
+                ${camera.position[0].toFixed(3)}, 
+                ${camera.position[1].toFixed(3)}, 
+                ${camera.position[2].toFixed(3)}
+            </span>
+            <span>
+                ${camera.direction[0].toFixed(3)}, 
+                ${camera.direction[1].toFixed(3)}, 
+                ${camera.direction[2].toFixed(3)}
+            </span>
+        `;
+    }
+
+    canvas.addEventListener('click', () => {
+        canvas.requestPointerLock();
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+        if(document.pointerLockElement === canvas) {
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('keydown', onKeyDown);
+            window.addEventListener('keyup', onKeyUp);
+            window.addEventListener('wheel', onWheel);
+        } else {
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('keydown', onKeyDown);
+            window.removeEventListener('keyup', onKeyUp);
+            window.removeEventListener('wheel', onWheel);
+        }
+    });
+
+
+    const mouseSensitivity = 0.05;
+    function onMouseMove(e: MouseEvent) {
+        let xOffset = e.movementX;
+        let yOffset = -e.movementY;
+
+        xOffset *= mouseSensitivity;
+        yOffset *= mouseSensitivity;
+
+        camera.rotate(xOffset, yOffset);
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+        pressedKeys[e.key] = true;
+    }
+
+    function onKeyUp(e: KeyboardEvent) {
+        pressedKeys[e.key] = false;
+    }
+
+    const zoomSensitivity = 0.01;
+    function onWheel(e: WheelEvent) {
+        fov += e.deltaY * zoomSensitivity;
+        fov = clamp(fov, 1, 45);
+    }
 });
 

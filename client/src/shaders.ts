@@ -1,3 +1,5 @@
+import {mat4} from 'gl-matrix';
+
 export function createShader(gl: WebGL2RenderingContext, source: string, type: number): WebGLShader {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -30,16 +32,6 @@ export function createProgram(gl: WebGL2RenderingContext,
         return null;
     }
 
-    // gl.validateProgram(shaderProgram);
-    // if(!gl.getProgramParameter(shaderProgram, gl.VALIDATE_STATUS)){
-    //     console.error('Shader program validation failed:', gl.getProgramInfoLog(shaderProgram));
-    //     gl.deleteProgram(shaderProgram);
-    //     gl.deleteShader(vertexShader);
-    //     gl.deleteShader(fragmentShader);
-    //
-    //     return null;
-    // }
-
     gl.detachShader(shaderProgram, vertexShader);
     gl.detachShader(shaderProgram, fragmentShader);
     gl.deleteShader(vertexShader);
@@ -51,11 +43,11 @@ export function createProgram(gl: WebGL2RenderingContext,
 export function getUniformLocation(gl: WebGL2RenderingContext,
                                    shaderProgram: WebGLProgram,
                                    name: string): WebGLUniformLocation {
-    return gl.getUniformLocation(shaderProgram, name);
-}
+    const location = gl.getUniformLocation(shaderProgram, name);
 
-export function setShaderUniform(gl: WebGL2RenderingContext,
-                                 location: WebGLUniformLocation,
-                                 value: number): void {
-    gl.uniform1f(location, value);
+    if (!location) {
+        console.warn(`Uniform ${name} either doesn't exist or isn't used`);
+    }
+
+    return location;
 }
