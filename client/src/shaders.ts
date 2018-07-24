@@ -51,3 +51,9 @@ export function getUniformLocation(gl: WebGL2RenderingContext,
 
     return location;
 }
+
+export function setUniformMatrix4fv(gl: WebGL2RenderingContext,
+                                    location: WebGLUniformLocation,
+                                    value: mat4) {
+    gl.uniformMatrix4fv(location, false, value);
+}

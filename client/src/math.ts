@@ -34,3 +34,7 @@ export function sin(value: number) {
 export function cos(value: number) {
     return Math.cos(value);
 }
+
+export function getRandomNumberInRange(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+}

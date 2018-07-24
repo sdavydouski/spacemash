@@ -1,5 +1,5 @@
 import {mat4, vec3} from 'gl-matrix';
-import {cos, max, min, outVec3, sin, toRadians} from './math';
+import {outVec3, sin, cos, toRadians, clamp} from './math';
 
 export interface Camera {
     position: vec3,
@@ -64,8 +64,7 @@ export function createCamera(position: vec3 = vec3.fromValues(0, 1, 3),
             this.yaw += xOffset;
             this.pitch += yOffset;
 
-            this.pitch = max(this.pitch, 89);
-            this.pitch = min(this.pitch, -89);
+            this.pitch = clamp(this.pitch, -89, 89);
 
             outVec3[0] = cos(toRadians(this.yaw)) * cos(toRadians(this.pitch));
             outVec3[1] = sin(toRadians(this.pitch));
