@@ -13,6 +13,8 @@ const pressedKeys: {
 getResources().then(([[
     gridVertexShaderSource, gridFragmentShaderSource,
     quadVertexShaderSource, quadFragmentShaderSource,
+], [
+    quadImage
 ]]) => {
     const canvas = <HTMLCanvasElement>document.getElementById('game-surface');
     const gl = getContext(canvas);
@@ -31,6 +33,11 @@ getResources().then(([[
     };
     window.addEventListener('resize', onResize);
     onResize();
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    gl.enable(gl.DEPTH_TEST);
 
     const transformationsBindingIndex = 0;
 
@@ -137,6 +144,18 @@ getResources().then(([[
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     // }
 
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    const quadTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, quadTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, quadImage);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+
     let lastTime = 0;
     function gameLoop() {
         const currentTime = performance.now();
@@ -151,7 +170,7 @@ getResources().then(([[
 
     gl.clearColor(0, 0, 0, 1);
     function render(delta: number) {
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         gl.bindBuffer(gl.UNIFORM_BUFFER, UBO);
         mat4.perspective(projection, toRadians(fov), screenWidth / screenHeight, 0.1, 100);
@@ -167,6 +186,9 @@ getResources().then(([[
 
         gl.useProgram(quadShaderProgram);
         gl.bindVertexArray(quadVAO);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, quadTexture);
 
         for (let i = 0; i < quadsCount; ++i) {
             setUniformMatrix4fv(gl, quadModelUniformLocation, quadModels[i]);

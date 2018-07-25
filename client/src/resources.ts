@@ -19,8 +19,23 @@ async function getShaders(): Promise<string[]> {
     ]);
 }
 
-export async function getResources(): Promise<string[][]> {
+function loadTexture(url: string): Promise<HTMLImageElement> {
+    return new Promise<HTMLImageElement>(resolve => {
+        const texture = new Image();
+        texture.src = url;
+        texture.onload = () => resolve(texture);
+    });
+}
+
+async function getTextures(): Promise<HTMLImageElement[]> {
     return await Promise.all([
-        getShaders()
+        loadTexture('/textures/awesomeface.png'),
+    ]);
+}
+
+export async function getResources(): Promise<[string[], HTMLImageElement[]]> {
+    return await Promise.all([
+        getShaders(),
+        getTextures()
     ]);
 }
