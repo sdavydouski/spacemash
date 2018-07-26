@@ -1,8 +1,15 @@
-import {mat4} from 'gl-matrix';
+import {mat4, vec3} from 'gl-matrix';
 import {getContext} from './gl';
 import {getResources} from './resources';
-import {createProgram, createShader, getUniformLocation, setUniformMatrix4fv} from './shaders';
-import {clamp, getRandomNumberInRange, toRadians} from './math';
+import {
+    createProgram,
+    createShader,
+    getUniformLocation,
+    setUniform1f,
+    setUniform1i,
+    setUniformMatrix4fv
+} from './shaders';
+import {clamp, toRadians} from './math';
 import {createCamera} from './camera';
 import {updateUI} from './ui';
 
@@ -12,9 +19,9 @@ const pressedKeys: {
 
 getResources().then(([[
     gridVertexShaderSource, gridFragmentShaderSource,
-    quadVertexShaderSource, quadFragmentShaderSource,
+    cubeVertexShaderSource, cubeFragmentShaderSource,
 ], [
-    quadImage
+    awesomeFaceImage, gridImage
 ]]) => {
     const canvas = <HTMLCanvasElement>document.getElementById('game-surface');
     const gl = getContext(canvas);
@@ -47,26 +54,19 @@ getResources().then(([[
     const gridUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
     gl.uniformBlockBinding(gridShaderProgram, gridUniformBlockIndex, transformationsBindingIndex);
 
-    const quadVertexShader = createShader(gl, quadVertexShaderSource, gl.VERTEX_SHADER);
-    const quadFragmentShader = createShader(gl, quadFragmentShaderSource, gl.FRAGMENT_SHADER);
-    const quadShaderProgram = createProgram(gl, quadVertexShader, quadFragmentShader);
-    const quadUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
-    gl.uniformBlockBinding(quadShaderProgram, quadUniformBlockIndex, transformationsBindingIndex);
-    const quadModelUniformLocation = getUniformLocation(gl, quadShaderProgram, 'model');
+    const cubeVertexShader = createShader(gl, cubeVertexShaderSource, gl.VERTEX_SHADER);
+    const cubeFragmentShader = createShader(gl, cubeFragmentShaderSource, gl.FRAGMENT_SHADER);
+    const cubeShaderProgram = createProgram(gl, cubeVertexShader, cubeFragmentShader);
+    const cubeUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
+    gl.uniformBlockBinding(cubeShaderProgram, cubeUniformBlockIndex, transformationsBindingIndex);
 
-    const quadsCount = 100;
-    const quadModels: mat4[] = [];
-    for (let i = 0; i < quadsCount; ++i) {
-        quadModels[i] = mat4.create();
-        mat4.translate(quadModels[i], quadModels[i], [
-            getRandomNumberInRange(-10, 10),
-            getRandomNumberInRange(0, 5),
-            getRandomNumberInRange(-10, 10)
-        ]);
-        mat4.rotateX(quadModels[i], quadModels[i], toRadians(getRandomNumberInRange(0, 360)));
-        mat4.rotateY(quadModels[i], quadModels[i], toRadians(getRandomNumberInRange(0, 360)));
-        mat4.rotateZ(quadModels[i], quadModels[i], toRadians(getRandomNumberInRange(0, 360)));
-    }
+    const cubeModelUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'model');
+    const model = mat4.create();
+    mat4.translate(model, model, [0, 1, 0]);
+    gl.useProgram(cubeShaderProgram);
+    setUniformMatrix4fv(gl, cubeModelUniformLocation, model);
+
+    const angleUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'angle');
 
     const projection = mat4.create();
     const view = mat4.create();
@@ -119,42 +119,107 @@ getResources().then(([[
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     // }
 
-    // quad setup {
-    const quad = new Float32Array([
-        -0.5, -0.5, 0, 0, 0,
-        -0.5, 0.5, 0, 0, 1,
-        0.5, -0.5, 0, 1, 0,
-        0.5, 0.5, 0, 1, 1
+    // cube setup {
+    const cube = new Float32Array([
+        // position          uv       color      normal
+
+        // front face
+        -0.5, -0.5, 0.5,    0, 1,    1, 0, 0,    0, 0, 1,
+        -0.5, 0.5, 0.5,     0, 0,    1, 0, 0,    0, 0, 1,
+        0.5, -0.5, 0.5,     1, 1,    1, 0, 0,    0, 0, 1,
+        0.5, 0.5, 0.5,      1, 0,    1, 0, 0,    0, 0, 1,
+        -0.5, 0.5, 0.5,     0, 0,    1, 0, 0,    0, 0, 1,
+        0.5, -0.5, 0.5,     1, 1,    1, 0, 0,    0, 0, 1,
+
+        // right face
+        0.5, -0.5, 0.5,     0, 1,    0, 1, 0,    1, 0, 0,
+        0.5, 0.5, 0.5,      0, 0,    0, 1, 0,    1, 0, 0,
+        0.5, -0.5, -0.5,    1, 1,    0, 1, 0,    1, 0, 0,
+        0.5, 0.5, -0.5,     1, 0,    0, 1, 0,    1, 0, 0,
+        0.5, 0.5, 0.5,      0, 0,    0, 1, 0,    1, 0, 0,
+        0.5, -0.5, -0.5,    1, 1,    0, 1, 0,    1, 0, 0,
+
+        // back face
+        0.5, -0.5, -0.5,    0, 1,    1, 1, 0,    0, 0, -1,
+        0.5, 0.5, -0.5,     0, 0,    1, 1, 0,    0, 0, -1,
+        -0.5, -0.5, -0.5,   1, 1,    1, 1, 0,    0, 0, -1,
+        -0.5, 0.5, -0.5,    1, 0,    1, 1, 0,    0, 0, -1,
+        0.5, 0.5, -0.5,     0, 0,    1, 1, 0,    0, 0, -1,
+        -0.5, -0.5, -0.5,   1, 1,    1, 1, 0,    0, 0, -1,
+
+        // left face
+        -0.5, -0.5, -0.5,   0, 1,    0, 0, 1,    -1, 0, 0,
+        -0.5, 0.5, -0.5,    0, 0,    0, 0, 1,    -1, 0, 0,
+        -0.5, -0.5, 0.5,    1, 1,    0, 0, 1,    -1, 0, 0,
+        -0.5, 0.5, 0.5,     1, 0,    0, 0, 1,    -1, 0, 0,
+        -0.5, 0.5, -0.5,    0, 0,    0, 0, 1,    -1, 0, 0,
+        -0.5, -0.5, 0.5,    1, 1,    0, 0, 1,    -1, 0, 0,
+
+        // top face
+        -0.5, 0.5, 0.5,     0, 1,    0, 1, 1,     0, 1, 0,
+        -0.5, 0.5, -0.5,    0, 0,    0, 1, 1,     0, 1, 0,
+        0.5, 0.5, 0.5,      1, 1,    0, 1, 1,     0, 1, 0,
+        0.5, 0.5, -0.5,     1, 0,    0, 1, 1,     0, 1, 0,
+        -0.5, 0.5, -0.5,    0, 0,    0, 1, 1,     0, 1, 0,
+        0.5, 0.5, 0.5,      1, 1,    0, 1, 1,     0, 1, 0,
+
+        // bottom face
+        -0.5, -0.5, -0.5,   0, 1,    1, 0, 1,     0, -1, 0,
+        -0.5, -0.5, 0.5,    0, 0,    1, 0, 1,     0, -1, 0,
+        0.5, -0.5, -0.5,    1, 1,    1, 0, 1,     0, -1, 0,
+        0.5, -0.5, 0.5,     1, 0,    1, 0, 1,     0, -1, 0,
+        -0.5, -0.5, 0.5,    0, 0,    1, 0, 1,     0, -1, 0,
+        0.5, -0.5, -0.5,    1, 1,    1, 0, 1,     0, -1, 0
     ]);
 
-    const quadVAO = gl.createVertexArray();
-    gl.bindVertexArray(quadVAO);
+    const cubeVAO = gl.createVertexArray();
+    gl.bindVertexArray(cubeVAO);
 
-    const quadVBO = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+    const cubeVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, cubeVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, cube, gl.STATIC_DRAW);
 
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
-        5 * Float32Array.BYTES_PER_ELEMENT, 0);
+        11 * Float32Array.BYTES_PER_ELEMENT, 0);
 
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false,
-        5 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+        11 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 3, gl.FLOAT, false,
+        11 * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 3, gl.FLOAT, false,
+        11 * Float32Array.BYTES_PER_ELEMENT, 8 * Float32Array.BYTES_PER_ELEMENT);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     // }
 
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    const quadTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, quadTexture);
+    const awesomeFaceTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, awesomeFaceTexture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, quadImage);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, awesomeFaceImage);
     gl.generateMipmap(gl.TEXTURE_2D);
-    gl.bindTexture(gl.TEXTURE_2D, null);
 
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    const gridTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, gridTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, gridImage);
+    gl.generateMipmap(gl.TEXTURE_2D);
+
+    gl.useProgram(cubeShaderProgram);
+    const awesomeFaceTextureUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'awesomeFaceTexture');
+    setUniform1i(gl, awesomeFaceTextureUniformLocation, 0);
+    const gridTextureUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'gridTexture');
+    setUniform1i(gl, gridTextureUniformLocation, 1);
+
+    // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
     let lastTime = 0;
     function gameLoop() {
@@ -167,6 +232,8 @@ getResources().then(([[
 
         window.requestAnimationFrame(gameLoop);
     }
+
+    let angle = 0;
 
     gl.clearColor(0, 0, 0, 1);
     function render(delta: number) {
@@ -184,16 +251,21 @@ getResources().then(([[
         gl.drawArrays(gl.LINES, 0, grid.length / 3);
         gl.bindVertexArray(null);
 
-        gl.useProgram(quadShaderProgram);
-        gl.bindVertexArray(quadVAO);
+        gl.useProgram(cubeShaderProgram);
+
+        angle += delta;
+        angle %= Math.PI * 2;
+        setUniform1f(gl, angleUniformLocation, angle);
+
+        gl.bindVertexArray(cubeVAO);
 
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, quadTexture);
+        gl.bindTexture(gl.TEXTURE_2D, awesomeFaceTexture);
 
-        for (let i = 0; i < quadsCount; ++i) {
-            setUniformMatrix4fv(gl, quadModelUniformLocation, quadModels[i]);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        }
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, gridTexture);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 36);
 
         gl.bindVertexArray(null);
 

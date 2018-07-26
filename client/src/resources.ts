@@ -7,8 +7,8 @@ async function getShaders(): Promise<string[]> {
     ] = await Promise.all([
         fetch('/shaders/grid/grid.vert'),
         fetch('/shaders/grid/grid.frag'),
-        fetch('/shaders/quad/quad.vert'),
-        fetch('/shaders/quad/quad.frag')
+        fetch('/shaders/cube/cube.vert'),
+        fetch('/shaders/cube/cube.frag')
     ]);
 
     return await Promise.all([
@@ -30,6 +30,7 @@ function loadTexture(url: string): Promise<HTMLImageElement> {
 async function getTextures(): Promise<HTMLImageElement[]> {
     return await Promise.all([
         loadTexture('/textures/awesomeface.png'),
+        loadTexture('/textures/grid.jpg')
     ]);
 }
 

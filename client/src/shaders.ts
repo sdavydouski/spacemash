@@ -57,3 +57,15 @@ export function setUniformMatrix4fv(gl: WebGL2RenderingContext,
                                     value: mat4) {
     gl.uniformMatrix4fv(location, false, value);
 }
+
+export function setUniform1f(gl: WebGL2RenderingContext,
+                              location: WebGLUniformLocation,
+                              value: number) {
+    gl.uniform1f(location, value);
+}
+
+export function setUniform1i(gl: WebGL2RenderingContext,
+                             location: WebGLUniformLocation,
+                             value: number) {
+    gl.uniform1i(location, value);
+}
