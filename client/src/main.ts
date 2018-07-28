@@ -12,6 +12,7 @@ import {
 import {clamp, toRadians} from './math';
 import {createCamera} from './camera';
 import {updateUI} from './ui';
+import {createSkymap, createTexture} from './textures';
 
 const pressedKeys: {
     [key: string]: any;
@@ -20,8 +21,10 @@ const pressedKeys: {
 getResources().then(([[
     gridVertexShaderSource, gridFragmentShaderSource,
     cubeVertexShaderSource, cubeFragmentShaderSource,
+    skymapVertexShaderSource, skymapFragmentShaderSource
 ], [
-    awesomeFaceImage, gridImage
+    awesomeFaceImage, gridImage,
+    bluespaceBackImage, bluespaceBottomImage, bluespaceFrontImage, bluespaceLeftImage, bluespaceRightImage, bluespaceTopImage
 ]]) => {
     const canvas = <HTMLCanvasElement>document.getElementById('game-surface');
     const gl = getContext(canvas);
@@ -60,6 +63,12 @@ getResources().then(([[
     const cubeUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
     gl.uniformBlockBinding(cubeShaderProgram, cubeUniformBlockIndex, transformationsBindingIndex);
 
+    const skymapVertexShader = createShader(gl, skymapVertexShaderSource, gl.VERTEX_SHADER);
+    const skymapFragmentShader = createShader(gl, skymapFragmentShaderSource, gl.FRAGMENT_SHADER);
+    const skymapShaderProgram = createProgram(gl, skymapVertexShader, skymapFragmentShader);
+    const skymapUniformBlockIndex = gl.getUniformBlockIndex(skymapShaderProgram, 'transformations');
+    gl.uniformBlockBinding(skymapShaderProgram, skymapUniformBlockIndex, transformationsBindingIndex);
+
     const cubeModelUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'model');
     const model = mat4.create();
     mat4.translate(model, model, [0, 1, 0]);
@@ -78,11 +87,11 @@ getResources().then(([[
     gl.bindBufferRange(gl.UNIFORM_BUFFER, transformationsBindingIndex, UBO, 0, projection.byteLength + view.byteLength);
     gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
-    const camera = createCamera();
+    const camera = createCamera(vec3.fromValues(-3, 3, 4), vec3.fromValues(0.5, -0.4, -0.8));
 
     // grid setup {
-    const HALF_WORLD_SIZE = 10;
-    const LINES_PER_AXIS = 50;
+    const HALF_WORLD_SIZE = 20;
+    const LINES_PER_AXIS = 20;
     const offset = 2 * HALF_WORLD_SIZE / (LINES_PER_AXIS - 1);
 
     const grid = new Float32Array(2 * LINES_PER_AXIS * 2 * 3);
@@ -124,52 +133,52 @@ getResources().then(([[
         // position          uv       color      normal
 
         // front face
-        -0.5, -0.5, 0.5,    0, 1,    1, 0, 0,    0, 0, 1,
-        -0.5, 0.5, 0.5,     0, 0,    1, 0, 0,    0, 0, 1,
-        0.5, -0.5, 0.5,     1, 1,    1, 0, 0,    0, 0, 1,
-        0.5, 0.5, 0.5,      1, 0,    1, 0, 0,    0, 0, 1,
-        -0.5, 0.5, 0.5,     0, 0,    1, 0, 0,    0, 0, 1,
-        0.5, -0.5, 0.5,     1, 1,    1, 0, 0,    0, 0, 1,
+        -1, -1, 1,    0, 1,    1, 0, 0,    0, 0, 1,
+        -1, 1, 1,     0, 0,    1, 0, 0,    0, 0, 1,
+        1, -1, 1,     1, 1,    1, 0, 0,    0, 0, 1,
+        1, 1, 1,      1, 0,    1, 0, 0,    0, 0, 1,
+        -1, 1, 1,     0, 0,    1, 0, 0,    0, 0, 1,
+        1, -1, 1,     1, 1,    1, 0, 0,    0, 0, 1,
 
         // right face
-        0.5, -0.5, 0.5,     0, 1,    0, 1, 0,    1, 0, 0,
-        0.5, 0.5, 0.5,      0, 0,    0, 1, 0,    1, 0, 0,
-        0.5, -0.5, -0.5,    1, 1,    0, 1, 0,    1, 0, 0,
-        0.5, 0.5, -0.5,     1, 0,    0, 1, 0,    1, 0, 0,
-        0.5, 0.5, 0.5,      0, 0,    0, 1, 0,    1, 0, 0,
-        0.5, -0.5, -0.5,    1, 1,    0, 1, 0,    1, 0, 0,
+        1, -1, 1,     0, 1,    0, 1, 0,    1, 0, 0,
+        1, 1, 1,      0, 0,    0, 1, 0,    1, 0, 0,
+        1, -1, -1,    1, 1,    0, 1, 0,    1, 0, 0,
+        1, 1, -1,     1, 0,    0, 1, 0,    1, 0, 0,
+        1, 1, 1,      0, 0,    0, 1, 0,    1, 0, 0,
+        1, -1, -1,    1, 1,    0, 1, 0,    1, 0, 0,
 
         // back face
-        0.5, -0.5, -0.5,    0, 1,    1, 1, 0,    0, 0, -1,
-        0.5, 0.5, -0.5,     0, 0,    1, 1, 0,    0, 0, -1,
-        -0.5, -0.5, -0.5,   1, 1,    1, 1, 0,    0, 0, -1,
-        -0.5, 0.5, -0.5,    1, 0,    1, 1, 0,    0, 0, -1,
-        0.5, 0.5, -0.5,     0, 0,    1, 1, 0,    0, 0, -1,
-        -0.5, -0.5, -0.5,   1, 1,    1, 1, 0,    0, 0, -1,
+        1, -1, -1,    0, 1,    1, 1, 0,    0, 0, -1,
+        1, 1, -1,     0, 0,    1, 1, 0,    0, 0, -1,
+        -1, -1, -1,   1, 1,    1, 1, 0,    0, 0, -1,
+        -1, 1, -1,    1, 0,    1, 1, 0,    0, 0, -1,
+        1, 1, -1,     0, 0,    1, 1, 0,    0, 0, -1,
+        -1, -1, -1,   1, 1,    1, 1, 0,    0, 0, -1,
 
         // left face
-        -0.5, -0.5, -0.5,   0, 1,    0, 0, 1,    -1, 0, 0,
-        -0.5, 0.5, -0.5,    0, 0,    0, 0, 1,    -1, 0, 0,
-        -0.5, -0.5, 0.5,    1, 1,    0, 0, 1,    -1, 0, 0,
-        -0.5, 0.5, 0.5,     1, 0,    0, 0, 1,    -1, 0, 0,
-        -0.5, 0.5, -0.5,    0, 0,    0, 0, 1,    -1, 0, 0,
-        -0.5, -0.5, 0.5,    1, 1,    0, 0, 1,    -1, 0, 0,
+        -1, -1, -1,   0, 1,    0, 0, 1,    -1, 0, 0,
+        -1, 1, -1,    0, 0,    0, 0, 1,    -1, 0, 0,
+        -1, -1, 1,    1, 1,    0, 0, 1,    -1, 0, 0,
+        -1, 1, 1,     1, 0,    0, 0, 1,    -1, 0, 0,
+        -1, 1, -1,    0, 0,    0, 0, 1,    -1, 0, 0,
+        -1, -1, 1,    1, 1,    0, 0, 1,    -1, 0, 0,
 
         // top face
-        -0.5, 0.5, 0.5,     0, 1,    0, 1, 1,     0, 1, 0,
-        -0.5, 0.5, -0.5,    0, 0,    0, 1, 1,     0, 1, 0,
-        0.5, 0.5, 0.5,      1, 1,    0, 1, 1,     0, 1, 0,
-        0.5, 0.5, -0.5,     1, 0,    0, 1, 1,     0, 1, 0,
-        -0.5, 0.5, -0.5,    0, 0,    0, 1, 1,     0, 1, 0,
-        0.5, 0.5, 0.5,      1, 1,    0, 1, 1,     0, 1, 0,
+        -1, 1, 1,     0, 1,    0, 1, 1,     0, 1, 0,
+        -1, 1, -1,    0, 0,    0, 1, 1,     0, 1, 0,
+        1, 1, 1,      1, 1,    0, 1, 1,     0, 1, 0,
+        1, 1, -1,     1, 0,    0, 1, 1,     0, 1, 0,
+        -1, 1, -1,    0, 0,    0, 1, 1,     0, 1, 0,
+        1, 1, 1,      1, 1,    0, 1, 1,     0, 1, 0,
 
         // bottom face
-        -0.5, -0.5, -0.5,   0, 1,    1, 0, 1,     0, -1, 0,
-        -0.5, -0.5, 0.5,    0, 0,    1, 0, 1,     0, -1, 0,
-        0.5, -0.5, -0.5,    1, 1,    1, 0, 1,     0, -1, 0,
-        0.5, -0.5, 0.5,     1, 0,    1, 0, 1,     0, -1, 0,
-        -0.5, -0.5, 0.5,    0, 0,    1, 0, 1,     0, -1, 0,
-        0.5, -0.5, -0.5,    1, 1,    1, 0, 1,     0, -1, 0
+        -1, -1, -1,   0, 1,    1, 0, 1,     0, -1, 0,
+        -1, -1, 1,    0, 0,    1, 0, 1,     0, -1, 0,
+        1, -1, -1,    1, 1,    1, 0, 1,     0, -1, 0,
+        1, -1, 1,     1, 0,    1, 0, 1,     0, -1, 0,
+        -1, -1, 1,    0, 0,    1, 0, 1,     0, -1, 0,
+        1, -1, -1,    1, 1,    1, 0, 1,     0, -1, 0
     ]);
 
     const cubeVAO = gl.createVertexArray();
@@ -199,25 +208,20 @@ getResources().then(([[
 
     // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    const awesomeFaceTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, awesomeFaceTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, awesomeFaceImage);
-    gl.generateMipmap(gl.TEXTURE_2D);
-
-    const gridTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, gridTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, gridImage);
-    gl.generateMipmap(gl.TEXTURE_2D);
+    const awesomeFaceTexture = createTexture(gl, gl.RGBA, awesomeFaceImage);
+    const gridTexture = createTexture(gl, gl.RGB, gridImage);
 
     gl.useProgram(cubeShaderProgram);
     const awesomeFaceTextureUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'awesomeFaceTexture');
     setUniform1i(gl, awesomeFaceTextureUniformLocation, 0);
     const gridTextureUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'gridTexture');
     setUniform1i(gl, gridTextureUniformLocation, 1);
+
+    const bluespaceSkymapTexture = createSkymap(gl, gl.RGB, {
+        right: bluespaceRightImage, left: bluespaceLeftImage,
+        top: bluespaceTopImage, bottom: bluespaceBottomImage,
+        back: bluespaceBackImage, front: bluespaceFrontImage
+    });
 
     // gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
@@ -234,13 +238,12 @@ getResources().then(([[
     }
 
     let angle = 0;
-
     gl.clearColor(0, 0, 0, 1);
     function render(delta: number) {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         gl.bindBuffer(gl.UNIFORM_BUFFER, UBO);
-        mat4.perspective(projection, toRadians(fov), screenWidth / screenHeight, 0.1, 100);
+        mat4.perspective(projection, toRadians(fov), screenWidth / screenHeight, 0.1, 1000);
         camera.updateViewMatrix(view);
         gl.bufferSubData(gl.UNIFORM_BUFFER, 0, projection);
         gl.bufferSubData(gl.UNIFORM_BUFFER, projection.byteLength, view);
@@ -249,25 +252,26 @@ getResources().then(([[
         gl.bindVertexArray(gridVAO);
         gl.useProgram(gridShaderProgram);
         gl.drawArrays(gl.LINES, 0, grid.length / 3);
-        gl.bindVertexArray(null);
 
         gl.useProgram(cubeShaderProgram);
-
         angle += delta;
         angle %= Math.PI * 2;
         setUniform1f(gl, angleUniformLocation, angle);
 
         gl.bindVertexArray(cubeVAO);
-
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, awesomeFaceTexture);
-
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, gridTexture);
-
         gl.drawArrays(gl.TRIANGLES, 0, 36);
 
-        gl.bindVertexArray(null);
+        // rendering skymap
+        gl.bindVertexArray(cubeVAO);
+        gl.depthFunc(gl.LEQUAL);
+        gl.useProgram(skymapShaderProgram);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, bluespaceSkymapTexture);
+        gl.drawArrays(gl.TRIANGLES, 0, 36);
+        gl.depthFunc(gl.LESS);
 
         updateUI([camera.position, camera.direction]);
     }
@@ -275,7 +279,7 @@ getResources().then(([[
     gameLoop();
 
     function input(delta: number) {
-        const speed = 2.5 * delta;
+        const speed = 5 * delta;
 
         if (pressedKeys.w) {
             camera.moveForward(speed);

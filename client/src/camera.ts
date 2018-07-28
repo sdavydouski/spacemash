@@ -1,5 +1,5 @@
 import {mat4, vec3} from 'gl-matrix';
-import {outVec3, sin, cos, toRadians, clamp} from './math';
+import {outVec3, sin, cos, clamp, toRadians, toDegrees, asin, atan} from './math';
 
 export interface Camera {
     position: vec3,
@@ -20,13 +20,16 @@ export interface Camera {
 export function createCamera(position: vec3 = vec3.fromValues(0, 1, 3),
                              direction: vec3 = vec3.fromValues(0, 0, -1),
                              up: vec3 = vec3.fromValues(0, 1, 0)): Camera {
+    const pitch = toDegrees(asin(direction[1]));
+    const yaw = toDegrees(atan(direction[2] / direction[0]));
+
     return {
         position,
         direction,
         up,
 
-        pitch: 0,
-        yaw: -90,
+        pitch,
+        yaw,
 
         updateViewMatrix(view: mat4) {
             mat4.lookAt(view, this.position, vec3.add(outVec3, this.position, this.direction), this.up);

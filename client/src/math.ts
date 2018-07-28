@@ -8,6 +8,10 @@ export function toRadians(degrees: number) {
     return degrees * radiansInOneDegree;
 }
 
+export function toDegrees(radians: number) {
+    return radians / radiansInOneDegree;
+}
+
 export function max(value: number, max: number) {
     if (value > max) return max;
 
@@ -33,6 +37,14 @@ export function sin(value: number) {
 
 export function cos(value: number) {
     return Math.cos(value);
+}
+
+export function asin(value: number) {
+    return Math.asin(value);
+}
+
+export function atan(value: number) {
+    return Math.atan(value);
 }
 
 export function getRandomNumberInRange(min: number, max: number) {
