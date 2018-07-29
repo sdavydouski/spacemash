@@ -45,25 +45,30 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/skymaps/blue/bkg1_right.png'),
         loadTexture('/textures/skymaps/blue/bkg1_top.png'),
 
-        // loadTexture('/textures/skymaps/lightblue/back.png'),
-        // loadTexture('/textures/skymaps/lightblue/bottom.png'),
-        // loadTexture('/textures/skymaps/lightblue/front.png'),
-        // loadTexture('/textures/skymaps/lightblue/left.png'),
-        // loadTexture('/textures/skymaps/lightblue/right.png'),
-        // loadTexture('/textures/skymaps/lightblue/top.png'),
-
-        // loadTexture('/textures/skymaps/debug/debug_back.png'),
-        // loadTexture('/textures/skymaps/debug/debug_bottom.png'),
-        // loadTexture('/textures/skymaps/debug/debug_front.png'),
-        // loadTexture('/textures/skymaps/debug/debug_left.png'),
-        // loadTexture('/textures/skymaps/debug/debug_right.png'),
-        // loadTexture('/textures/skymaps/debug/debug_top.png')
+        loadTexture('/textures/sphere_test_texture.png'),
+        loadTexture('/textures/monkey_test_texture.png')
     ]);
 }
 
-export async function getResources(): Promise<[string[], HTMLImageElement[]]> {
+async function getModels(): Promise<string[]> {
+    const [
+        sphereMeshResponse,
+        monkeyMeshResponse
+    ] = await Promise.all([
+        fetch('/models/sphere/sphere.obj'),
+        fetch('/models/monkey/monkey.obj')
+    ]);
+
+    return await Promise.all([
+        sphereMeshResponse.text(),
+        monkeyMeshResponse.text()
+    ]);
+}
+
+export async function getResources(): Promise<[string[], HTMLImageElement[], string[]]> {
     return await Promise.all([
         getShaders(),
-        getTextures()
+        getTextures(),
+        getModels()
     ]);
 }
