@@ -19,14 +19,13 @@ const pressedKeys: {
 
 getResources().then(([[
     gridVertexShaderSource, gridFragmentShaderSource,
-    cubeVertexShaderSource, cubeFragmentShaderSource,
+    generalVertexShaderSource, generalFragmentShaderSource,
     skymapVertexShaderSource, skymapFragmentShaderSource
 ], [
-    awesomeFaceImage, gridImage,
     bluespaceBackImage, bluespaceBottomImage, bluespaceFrontImage, bluespaceLeftImage, bluespaceRightImage, bluespaceTopImage,
-    sphereTestImage, monkeyTestImage
+    sunImage, mercuryImage, venusImage, earthImage, marsImage
 ], [
-    sphereMeshObj, monkeyMeshObj
+    cubeMesh, sphereMesh
 ]]) => {
     const canvas = <HTMLCanvasElement>document.getElementById('game-surface');
     const gl = getContext(canvas);
@@ -59,11 +58,11 @@ getResources().then(([[
     const gridUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
     gl.uniformBlockBinding(gridShaderProgram, gridUniformBlockIndex, transformationsBindingIndex);
 
-    const cubeVertexShader = createShader(gl, cubeVertexShaderSource, gl.VERTEX_SHADER);
-    const cubeFragmentShader = createShader(gl, cubeFragmentShaderSource, gl.FRAGMENT_SHADER);
-    const cubeShaderProgram = createProgram(gl, cubeVertexShader, cubeFragmentShader);
-    const cubeUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
-    gl.uniformBlockBinding(cubeShaderProgram, cubeUniformBlockIndex, transformationsBindingIndex);
+    const generalVertexShader = createShader(gl, generalVertexShaderSource, gl.VERTEX_SHADER);
+    const generalFragmentShader = createShader(gl, generalFragmentShaderSource, gl.FRAGMENT_SHADER);
+    const generalShaderProgram = createProgram(gl, generalVertexShader, generalFragmentShader);
+    const generalUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
+    gl.uniformBlockBinding(generalShaderProgram, generalUniformBlockIndex, transformationsBindingIndex);
 
     const skymapVertexShader = createShader(gl, skymapVertexShaderSource, gl.VERTEX_SHADER);
     const skymapFragmentShader = createShader(gl, skymapFragmentShaderSource, gl.FRAGMENT_SHADER);
@@ -71,7 +70,7 @@ getResources().then(([[
     const skymapUniformBlockIndex = gl.getUniformBlockIndex(skymapShaderProgram, 'transformations');
     gl.uniformBlockBinding(skymapShaderProgram, skymapUniformBlockIndex, transformationsBindingIndex);
 
-    const cubeModelUniformLocation = getUniformLocation(gl, cubeShaderProgram, 'model');
+    const generalModelUniformLocation = getUniformLocation(gl, generalShaderProgram, 'model');
     const model = mat4.create();
 
     const projection = mat4.create();
@@ -87,7 +86,7 @@ getResources().then(([[
     const camera = createCamera(vec3.fromValues(0, 15, 100), vec3.fromValues(0, 0, -1));
 
     // grid setup {
-    const HALF_WORLD_SIZE = 100;
+    const HALF_WORLD_SIZE = 2000;
     const LINES_PER_AXIS = 22;
     const offset = 2 * HALF_WORLD_SIZE / (LINES_PER_AXIS - 1);
 
@@ -126,56 +125,7 @@ getResources().then(([[
     // }
 
     // cube setup {
-    const cube = new Float32Array([
-        // position    uv      normal
-        // front face
-        -1, -1, 1,    0, 1,    0, 0, 1,
-        -1, 1, 1,     0, 0,    0, 0, 1,
-        1, -1, 1,     1, 1,    0, 0, 1,
-        1, 1, 1,      1, 0,    0, 0, 1,
-        -1, 1, 1,     0, 0,    0, 0, 1,
-        1, -1, 1,     1, 1,    0, 0, 1,
-
-        // right face
-        1, -1, 1,     0, 1,    1, 0, 0,
-        1, 1, 1,      0, 0,    1, 0, 0,
-        1, -1, -1,    1, 1,    1, 0, 0,
-        1, 1, -1,     1, 0,    1, 0, 0,
-        1, 1, 1,      0, 0,    1, 0, 0,
-        1, -1, -1,    1, 1,    1, 0, 0,
-
-        // back face
-        1, -1, -1,    0, 1,    0, 0, -1,
-        1, 1, -1,     0, 0,    0, 0, -1,
-        -1, -1, -1,   1, 1,    0, 0, -1,
-        -1, 1, -1,    1, 0,    0, 0, -1,
-        1, 1, -1,     0, 0,    0, 0, -1,
-        -1, -1, -1,   1, 1,    0, 0, -1,
-
-        // left face
-        -1, -1, -1,   0, 1,    -1, 0, 0,
-        -1, 1, -1,    0, 0,    -1, 0, 0,
-        -1, -1, 1,    1, 1,    -1, 0, 0,
-        -1, 1, 1,     1, 0,    -1, 0, 0,
-        -1, 1, -1,    0, 0,    -1, 0, 0,
-        -1, -1, 1,    1, 1,    -1, 0, 0,
-
-        // top face
-        -1, 1, 1,     0, 1,    0, 1, 0,
-        -1, 1, -1,    0, 0,    0, 1, 0,
-        1, 1, 1,      1, 1,    0, 1, 0,
-        1, 1, -1,     1, 0,    0, 1, 0,
-        -1, 1, -1,    0, 0,    0, 1, 0,
-        1, 1, 1,      1, 1,    0, 1, 0,
-
-        // bottom face
-        -1, -1, -1,   0, 1,    0, -1, 0,
-        -1, -1, 1,    0, 0,    0, -1, 0,
-        1, -1, -1,    1, 1,    0, -1, 0,
-        1, -1, 1,     1, 0,    0, -1, 0,
-        -1, -1, 1,    0, 0,    0, -1, 0,
-        1, -1, -1,    1, 1,    0, -1, 0
-    ]);
+    const cube = parseObj(cubeMesh);
 
     const cubeVAO = gl.createVertexArray();
     gl.bindVertexArray(cubeVAO);
@@ -198,7 +148,7 @@ getResources().then(([[
     // }
 
     // sphere setup {
-    const sphere = parseObj(sphereMeshObj);
+    const sphere = parseObj(sphereMesh);
 
     const sphereVAO = gl.createVertexArray();
     gl.bindVertexArray(sphereVAO);
@@ -220,33 +170,13 @@ getResources().then(([[
         8 * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
     // }
 
-    // monkey setup {
-    const monkey = parseObj(monkeyMeshObj);
-
-    const monkeyVAO = gl.createVertexArray();
-    gl.bindVertexArray(monkeyVAO);
-
-    const monkeyVBO = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, monkeyVBO);
-    gl.bufferData(gl.ARRAY_BUFFER, monkey, gl.STATIC_DRAW);
-
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 0);
-
-    gl.enableVertexAttribArray(1);
-    gl.vertexAttribPointer(1, 2, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
-
-    gl.enableVertexAttribArray(2);
-    gl.vertexAttribPointer(2, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
-    // }
-
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    const sphereTestTexture = createTexture(gl, gl.RGBA, sphereTestImage);
-    const monkeyTestTexture = createTexture(gl, gl.RGBA, monkeyTestImage);
+    const sunTexture = createTexture(gl, gl.RGB, sunImage);
+    const mercuryTexture = createTexture(gl, gl.RGB, mercuryImage);
+    const venusTexture = createTexture(gl, gl.RGB, venusImage);
+    const earthTexture = createTexture(gl, gl.RGB, earthImage);
+    const marsTexture = createTexture(gl, gl.RGB, marsImage);
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
@@ -275,40 +205,66 @@ getResources().then(([[
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         gl.bindBuffer(gl.UNIFORM_BUFFER, UBO);
-        mat4.perspective(projection, toRadians(fov), screenWidth / screenHeight, 0.1, 1000);
+        mat4.perspective(projection, toRadians(fov), screenWidth / screenHeight, 0.1, 10000);
         camera.updateViewMatrix(view);
         gl.bufferSubData(gl.UNIFORM_BUFFER, 0, projection);
         gl.bufferSubData(gl.UNIFORM_BUFFER, projection.byteLength, view);
         gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
-        gl.bindVertexArray(gridVAO);
-        gl.useProgram(gridShaderProgram);
-        gl.drawArrays(gl.LINES, 0, grid.length / 3);
+        // gl.bindVertexArray(gridVAO);
+        // gl.useProgram(gridShaderProgram);
+        // gl.drawArrays(gl.LINES, 0, grid.length / 3);
 
         angle += toRadians(delta);
         angle %= 2 * Math.PI;
 
+        // sun
         gl.bindVertexArray(sphereVAO);
-        gl.useProgram(cubeShaderProgram);
+        gl.useProgram(generalShaderProgram);
         mat4.identity(model);
-        mat4.translate(model, model, [0, 25, 0]);
-        mat4.rotateY(model, model, angle * 50);
-        mat4.scale(model, model, [15, 15, 15]);
-        setUniformMatrix4fv(gl, cubeModelUniformLocation, model);
-        gl.bindTexture(gl.TEXTURE_2D, sphereTestTexture);
+        mat4.rotateY(model, model, angle * 10);
+        mat4.scale(model, model, [5, 5, 5]);
+        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        gl.bindTexture(gl.TEXTURE_2D, sunTexture);
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
 
-        gl.bindVertexArray(monkeyVAO);
-        gl.useProgram(cubeShaderProgram);
+        // mercury
         mat4.identity(model);
-        mat4.translate(model, model, [sin(-angle * 70) * 30, 25, cos(angle * 70) * 30]);
-        mat4.rotateY(model, model, angle * 100);
-        mat4.scale(model, model, [7, 7, 7]);
-        setUniformMatrix4fv(gl, cubeModelUniformLocation, model);
-        gl.bindTexture(gl.TEXTURE_2D, monkeyTestTexture);
-        gl.drawArrays(gl.TRIANGLES, 0, monkey.length / 8);
+        mat4.translate(model, model, [sin(-angle * 40) * 70, 0, cos(angle * 40) * 70]);
+        mat4.rotateY(model, model, angle * 50);
+        mat4.scale(model, model, [0.1, 0.1, 0.1]);
+        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        gl.bindTexture(gl.TEXTURE_2D, mercuryTexture);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
 
-        // rendering skymap
+        // venus
+        mat4.identity(model);
+        mat4.translate(model, model, [sin(-angle * 20) * 200, 0, cos(angle * 20) * 200]);
+        mat4.rotateY(model, model, angle * 50);
+        mat4.scale(model, model, [0.3, 0.3, 0.3]);
+        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        gl.bindTexture(gl.TEXTURE_2D, venusTexture);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+
+        // earth
+        mat4.identity(model);
+        mat4.translate(model, model, [sin(-angle * 10) * 300, 0, cos(angle * 10) * 300]);
+        mat4.rotateY(model, model, angle * 50);
+        mat4.scale(model, model, [0.5, 0.5, 0.5]);
+        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        gl.bindTexture(gl.TEXTURE_2D, earthTexture);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+
+        // mars
+        mat4.identity(model);
+        mat4.translate(model, model, [sin(-angle * 5) * 450, 0, cos(angle * 5) * 450]);
+        mat4.rotateY(model, model, angle * 50);
+        mat4.scale(model, model, [0.45, 0.45, 0.45]);
+        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        gl.bindTexture(gl.TEXTURE_2D, marsTexture);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+
+        // skymap
         gl.bindVertexArray(cubeVAO);
         gl.depthFunc(gl.LEQUAL);
         gl.useProgram(skymapShaderProgram);
@@ -322,7 +278,7 @@ getResources().then(([[
     gameLoop();
 
     function input(delta: number) {
-        const speed = 20 * delta;
+        const speed = 200 * delta;
 
         if (pressedKeys.w) {
             camera.moveForward(speed);

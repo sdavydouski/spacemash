@@ -2,15 +2,15 @@ async function getShaders(): Promise<string[]> {
     const [
         gridVertexShaderResponse,
         gridFragmentShaderResponse,
-        quadVertexShaderResponse,
-        quadFragmentShaderResponse,
+        generalVertexShaderResponse,
+        generalFragmentShaderResponse,
         skymapVertexShaderResponse,
         skymapFragmentShaderResponse
     ] = await Promise.all([
         fetch('/shaders/grid/grid.vert'),
         fetch('/shaders/grid/grid.frag'),
-        fetch('/shaders/cube/cube.vert'),
-        fetch('/shaders/cube/cube.frag'),
+        fetch('/shaders/general/general.vert'),
+        fetch('/shaders/general/general.frag'),
         fetch('/shaders/skymap/skymap.vert'),
         fetch('/shaders/skymap/skymap.frag')
     ]);
@@ -18,8 +18,8 @@ async function getShaders(): Promise<string[]> {
     return await Promise.all([
         gridVertexShaderResponse.text(),
         gridFragmentShaderResponse.text(),
-        quadVertexShaderResponse.text(),
-        quadFragmentShaderResponse.text(),
+        generalVertexShaderResponse.text(),
+        generalFragmentShaderResponse.text(),
         skymapVertexShaderResponse.text(),
         skymapFragmentShaderResponse.text()
     ]);
@@ -35,9 +35,6 @@ function loadTexture(url: string): Promise<HTMLImageElement> {
 
 async function getTextures(): Promise<HTMLImageElement[]> {
     return await Promise.all([
-        loadTexture('/textures/awesomeface.png'),
-        loadTexture('/textures/grid.jpg'),
-
         loadTexture('/textures/skymaps/blue/bkg1_back.png'),
         loadTexture('/textures/skymaps/blue/bkg1_bottom.png'),
         loadTexture('/textures/skymaps/blue/bkg1_front.png'),
@@ -45,23 +42,26 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/skymaps/blue/bkg1_right.png'),
         loadTexture('/textures/skymaps/blue/bkg1_top.png'),
 
-        loadTexture('/textures/sphere_test_texture.png'),
-        loadTexture('/textures/monkey_test_texture.png')
+        loadTexture('/textures/sun.jpg'),
+        loadTexture('/textures/mercury.jpg'),
+        loadTexture('/textures/venus.jpg'),
+        loadTexture('/textures/earth.jpg'),
+        loadTexture('/textures/mars.jpg')
     ]);
 }
 
 async function getModels(): Promise<string[]> {
     const [
-        sphereMeshResponse,
-        monkeyMeshResponse
+        cubeMeshResponse,
+        sphereMeshResponse
     ] = await Promise.all([
-        fetch('/models/sphere/sphere.obj'),
-        fetch('/models/monkey/monkey.obj')
+        fetch('/models/cube/cube.obj'),
+        fetch('/models/sphere/sphere.obj')
     ]);
 
     return await Promise.all([
-        sphereMeshResponse.text(),
-        monkeyMeshResponse.text()
+        cubeMeshResponse.text(),
+        sphereMeshResponse.text()
     ]);
 }
 
