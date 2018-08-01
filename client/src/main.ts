@@ -1,13 +1,13 @@
-import {mat4, vec3} from 'gl-matrix';
+import {mat3, mat4, vec3} from 'gl-matrix';
 import {getContext} from './gl';
 import {getResources} from './resources';
 import {
     createProgram,
     createShader,
-    getUniformLocation,
+    getUniformLocation, setUniform1f, setUniform1i, setUniform3fv, setUniformMatrix3fv,
     setUniformMatrix4fv
 } from './shaders';
-import {clamp, cos, sin, toRadians} from './math';
+import {clamp, cos, outMat3, outMat4, sin, toRadians} from './math';
 import {createCamera} from './camera';
 import {updateUI} from './ui';
 import {createSkymap, createTexture} from './textures';
@@ -20,10 +20,12 @@ const pressedKeys: {
 getResources().then(([[
     gridVertexShaderSource, gridFragmentShaderSource,
     generalVertexShaderSource, generalFragmentShaderSource,
-    skymapVertexShaderSource, skymapFragmentShaderSource
+    skymapVertexShaderSource, skymapFragmentShaderSource,
+    lightingVertexShaderSource, lightingFragmentShaderSource
 ], [
     bluespaceBackImage, bluespaceBottomImage, bluespaceFrontImage, bluespaceLeftImage, bluespaceRightImage, bluespaceTopImage,
-    sunImage, mercuryImage, venusImage, earthImage, marsImage
+    sunImage, mercuryImage, venusImage, earthDayDiffuseMapImage, earthSpecularMapImage, marsImage,
+    diffuseImage, specularImage
 ], [
     cubeMesh, sphereMesh
 ]]) => {
@@ -72,6 +74,34 @@ getResources().then(([[
 
     const generalModelUniformLocation = getUniformLocation(gl, generalShaderProgram, 'model');
     const model = mat4.create();
+
+    const lightingVertexShader = createShader(gl, lightingVertexShaderSource, gl.VERTEX_SHADER);
+    const lightingFragmentShader = createShader(gl, lightingFragmentShaderSource, gl.FRAGMENT_SHADER);
+    const lightingShaderProgram = createProgram(gl, lightingVertexShader, lightingFragmentShader);
+    const lightingUniformBlockIndex = gl.getUniformBlockIndex(lightingShaderProgram, 'transformations');
+    gl.uniformBlockBinding(lightingShaderProgram, lightingUniformBlockIndex, transformationsBindingIndex);
+    const lightingModelUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'model');
+    const lightingModel = mat4.create();
+
+    const lightPosition = vec3.fromValues(0, 0, 0);
+
+    gl.useProgram(lightingShaderProgram);
+    const lightPositionUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'uLightPosition');
+    setUniform3fv(gl, lightPositionUniformLocation, lightPosition);
+    const normalMatrixUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'normalMatrix');
+    const normalMatrix = mat3.create();
+    
+    const materialDiffuseMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.diffuse');
+    setUniform1i(gl, materialDiffuseMapUniformLocation, 0);
+    const materialSpecularMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.specular');
+    setUniform1i(gl, materialSpecularMapUniformLocation, 1);
+    const materialShininessUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.shininess');
+
+    const lightAmbientUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.ambient');
+    setUniform3fv(gl, lightAmbientUniformLocation, vec3.fromValues(0.1, 0.1, 0.1));
+    const lightDiffuseUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.diffuse');
+    setUniform3fv(gl, lightDiffuseUniformLocation, vec3.fromValues(0.5, 0.5, 0.5));
+    const lightSpecularUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.specular');
 
     const projection = mat4.create();
     const view = mat4.create();
@@ -175,8 +205,12 @@ getResources().then(([[
     const sunTexture = createTexture(gl, gl.RGB, sunImage);
     const mercuryTexture = createTexture(gl, gl.RGB, mercuryImage);
     const venusTexture = createTexture(gl, gl.RGB, venusImage);
-    const earthTexture = createTexture(gl, gl.RGB, earthImage);
+    const earthDayDiffuseMapTexture = createTexture(gl, gl.RGB, earthDayDiffuseMapImage);
+    const earthSpecularMapTexture = createTexture(gl, gl.RGB, earthSpecularMapImage);
     const marsTexture = createTexture(gl, gl.RGB, marsImage);
+
+    const diffuseMapTexture = createTexture(gl, gl.RGBA, diffuseImage);
+    const specularMapTexture = createTexture(gl, gl.RGBA, specularImage);
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
@@ -220,49 +254,84 @@ getResources().then(([[
 
         // sun
         gl.bindVertexArray(sphereVAO);
+
+        // gl.useProgram(lightingShaderProgram);
+        // vec3.copy(lightPosition, [sin(-angle * 50) * 150, 10, cos(angle * 50) * 150]);
+        // setUniform3fv(gl, lightPositionUniformLocation, lightPosition);
+
         gl.useProgram(generalShaderProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, sunTexture);
         mat4.identity(model);
+        mat4.translate(model, model, lightPosition);
         mat4.rotateY(model, model, angle * 10);
         mat4.scale(model, model, [5, 5, 5]);
         setUniformMatrix4fv(gl, generalModelUniformLocation, model);
-        gl.bindTexture(gl.TEXTURE_2D, sunTexture);
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
 
         // mercury
-        mat4.identity(model);
-        mat4.translate(model, model, [sin(-angle * 40) * 70, 0, cos(angle * 40) * 70]);
-        mat4.rotateY(model, model, angle * 50);
-        mat4.scale(model, model, [0.1, 0.1, 0.1]);
-        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
-        gl.bindTexture(gl.TEXTURE_2D, mercuryTexture);
+        // mat4.identity(model);
+        // mat4.translate(model, model, [sin(-angle * 40) * 70, 0, cos(angle * 40) * 70]);
+        // mat4.rotateY(model, model, angle * 50);
+        // mat4.scale(model, model, [0.1, 0.1, 0.1]);
+        // setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        // gl.bindTexture(gl.TEXTURE_2D, mercuryTexture);
+        // gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        //
+        // // venus
+        // mat4.identity(model);
+        // mat4.translate(model, model, [sin(-angle * 20) * 200, 0, cos(angle * 20) * 200]);
+        // mat4.rotateY(model, model, angle * 50);
+        // mat4.scale(model, model, [0.3, 0.3, 0.3]);
+        // setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        // gl.bindTexture(gl.TEXTURE_2D, venusTexture);
+        // gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        //
+        // // earth
+        gl.useProgram(lightingShaderProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, earthDayDiffuseMapTexture);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, earthSpecularMapTexture);
+        mat4.identity(lightingModel);
+        mat4.translate(lightingModel, lightingModel, [-100, 0, 100]);
+        mat4.rotateY(lightingModel, lightingModel, angle * 20);
+        mat4.scale(lightingModel, lightingModel, [0.5, 0.5, 0.5]);
+        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
+        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
+        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
+        setUniform1f(gl, materialShininessUniformLocation, 2);
+        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.1, 0.1, 0.1));
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        //
+        // // mars
+        // mat4.identity(model);
+        // mat4.translate(model, model, [sin(-angle * 5) * 450, 0, cos(angle * 5) * 450]);
+        // mat4.rotateY(model, model, angle * 50);
+        // mat4.scale(model, model, [0.45, 0.45, 0.45]);
+        // setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        // gl.bindTexture(gl.TEXTURE_2D, marsTexture);
+        // gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
 
-        // venus
-        mat4.identity(model);
-        mat4.translate(model, model, [sin(-angle * 20) * 200, 0, cos(angle * 20) * 200]);
-        mat4.rotateY(model, model, angle * 50);
-        mat4.scale(model, model, [0.3, 0.3, 0.3]);
-        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
-        gl.bindTexture(gl.TEXTURE_2D, venusTexture);
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
-
-        // earth
-        mat4.identity(model);
-        mat4.translate(model, model, [sin(-angle * 10) * 300, 0, cos(angle * 10) * 300]);
-        mat4.rotateY(model, model, angle * 50);
-        mat4.scale(model, model, [0.5, 0.5, 0.5]);
-        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
-        gl.bindTexture(gl.TEXTURE_2D, earthTexture);
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
-
-        // mars
-        mat4.identity(model);
-        mat4.translate(model, model, [sin(-angle * 5) * 450, 0, cos(angle * 5) * 450]);
-        mat4.rotateY(model, model, angle * 50);
-        mat4.scale(model, model, [0.45, 0.45, 0.45]);
-        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
-        gl.bindTexture(gl.TEXTURE_2D, marsTexture);
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        // cube
+        gl.bindVertexArray(cubeVAO);
+        gl.useProgram(lightingShaderProgram);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, diffuseMapTexture);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, specularMapTexture);
+        mat4.identity(lightingModel);
+        mat4.translate(lightingModel, lightingModel, [100, 0, 100]);
+        mat4.rotateX(lightingModel, lightingModel, angle * 10);
+        mat4.rotateY(lightingModel, lightingModel, angle * 20);
+        mat4.rotateZ(lightingModel, lightingModel, angle * 30);
+        mat4.scale(lightingModel, lightingModel, [8, 8, 8]);
+        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
+        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
+        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
+        setUniform1f(gl, materialShininessUniformLocation, 64);
+        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(1, 1, 1));
+        gl.drawArrays(gl.TRIANGLES, 0, cube.length / 8);
 
         // skymap
         gl.bindVertexArray(cubeVAO);

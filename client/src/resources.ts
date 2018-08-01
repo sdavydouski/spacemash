@@ -5,14 +5,18 @@ async function getShaders(): Promise<string[]> {
         generalVertexShaderResponse,
         generalFragmentShaderResponse,
         skymapVertexShaderResponse,
-        skymapFragmentShaderResponse
+        skymapFragmentShaderResponse,
+        lightingVertexShaderResponse,
+        lightingFragmentShaderResponse
     ] = await Promise.all([
         fetch('/shaders/grid/grid.vert'),
         fetch('/shaders/grid/grid.frag'),
         fetch('/shaders/general/general.vert'),
         fetch('/shaders/general/general.frag'),
         fetch('/shaders/skymap/skymap.vert'),
-        fetch('/shaders/skymap/skymap.frag')
+        fetch('/shaders/skymap/skymap.frag'),
+        fetch('/shaders/lighting/lighting.vert'),
+        fetch('/shaders/lighting/lighting.frag')
     ]);
 
     return await Promise.all([
@@ -21,7 +25,9 @@ async function getShaders(): Promise<string[]> {
         generalVertexShaderResponse.text(),
         generalFragmentShaderResponse.text(),
         skymapVertexShaderResponse.text(),
-        skymapFragmentShaderResponse.text()
+        skymapFragmentShaderResponse.text(),
+        lightingVertexShaderResponse.text(),
+        lightingFragmentShaderResponse.text()
     ]);
 }
 
@@ -45,8 +51,12 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/sun.jpg'),
         loadTexture('/textures/mercury.jpg'),
         loadTexture('/textures/venus.jpg'),
-        loadTexture('/textures/earth.jpg'),
-        loadTexture('/textures/mars.jpg')
+        loadTexture('/textures/earth_day_diffuse_map.jpg'),
+        loadTexture('/textures/earth_specular_map.jpg'),
+        loadTexture('/textures/mars.jpg'),
+
+        loadTexture('/textures/container_diffuse.png'),
+        loadTexture('/textures/container_specular.png')
     ]);
 }
 

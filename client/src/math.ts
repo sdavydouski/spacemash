@@ -1,8 +1,10 @@
-import {vec3} from 'gl-matrix';
+import {mat3, mat4, vec3} from 'gl-matrix';
 
 const radiansInOneDegree = Math.PI / 180;
 
 export const outVec3 = vec3.create();
+export const outMat3 = mat3.create();
+export const outMat4 = mat4.create();
 
 export function toRadians(degrees: number) {
     return degrees * radiansInOneDegree;

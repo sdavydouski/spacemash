@@ -1,4 +1,4 @@
-import {mat4} from 'gl-matrix';
+import {mat3, mat4, vec3} from 'gl-matrix';
 
 export function createShader(gl: WebGL2RenderingContext, source: string, type: number): WebGLShader {
     const shader = gl.createShader(type);
@@ -53,9 +53,21 @@ export function getUniformLocation(gl: WebGL2RenderingContext,
 }
 
 export function setUniformMatrix4fv(gl: WebGL2RenderingContext,
-                                    location: WebGLUniformLocation,
-                                    value: mat4) {
+                                     location: WebGLUniformLocation,
+                                     value: mat4) {
     gl.uniformMatrix4fv(location, false, value);
+}
+
+export function setUniformMatrix3fv(gl: WebGL2RenderingContext,
+                                    location: WebGLUniformLocation,
+                                    value: mat3) {
+    gl.uniformMatrix3fv(location, false, value);
+}
+
+export function setUniform3fv(gl: WebGL2RenderingContext,
+                             location: WebGLUniformLocation,
+                             value: vec3) {
+    gl.uniform3fv(location, value);
 }
 
 export function setUniform1f(gl: WebGL2RenderingContext,

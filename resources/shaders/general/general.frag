@@ -6,8 +6,8 @@ in vec2 uv;
 
 out vec4 finalColor;
 
-uniform sampler2D testTexture;
+uniform sampler2D generalTexture;
 
 void main() {
-    finalColor = texture(testTexture, uv);
+    finalColor = texture(generalTexture, uv);
 }
