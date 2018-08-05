@@ -56,22 +56,29 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/mars.jpg'),
 
         loadTexture('/textures/container_diffuse.png'),
-        loadTexture('/textures/container_specular.png')
+        loadTexture('/textures/container_specular.png'),
+
+        loadTexture('/textures/none_specular_map.jpg'),
+
+        loadTexture('/textures/space_ship_test_color.png')
     ]);
 }
 
 async function getModels(): Promise<string[]> {
     const [
         cubeMeshResponse,
-        sphereMeshResponse
+        sphereMeshResponse,
+        spaceshipMeshResponse,
     ] = await Promise.all([
         fetch('/models/cube/cube.obj'),
-        fetch('/models/sphere/sphere.obj')
+        fetch('/models/sphere/sphere.obj'),
+        fetch('/models/spaceship/spaceship.obj')
     ]);
 
     return await Promise.all([
         cubeMeshResponse.text(),
-        sphereMeshResponse.text()
+        sphereMeshResponse.text(),
+        spaceshipMeshResponse.text()
     ]);
 }
 

@@ -19,6 +19,11 @@ struct Light {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
+
+    // attenuation coefficients
+    float constant;
+    float linear;
+    float quadratic;
 };
 
 uniform Material material;
@@ -27,6 +32,9 @@ uniform Light light;
 void main() {
     vec3 diffuseColor = vec3(texture(material.diffuse, uv));
     vec3 specularIntensity = vec3(texture(material.specular, uv));
+
+    float distance = length(lightPosition - fragmentPosition);
+    float attenuation = 1.f / (light.constant + light.linear * distance + light.quadratic * distance * distance);
 
     // ambient
     vec3 ambient = light.ambient * diffuseColor;   // ambient is the same as diffuse
@@ -43,7 +51,7 @@ void main() {
     float spec = pow(max(dot(eyeDirection, reflectionDirection), 0.f), material.shininess);
     vec3 specular = light.specular * spec * specularIntensity;
 
-    vec3 result = ambient + diffuse + specular;
+    vec3 result = (ambient + diffuse + specular) * attenuation;
 
     finalColor = vec4(result, 1.f);
 }

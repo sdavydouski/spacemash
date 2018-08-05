@@ -53,8 +53,8 @@ export function getUniformLocation(gl: WebGL2RenderingContext,
 }
 
 export function setUniformMatrix4fv(gl: WebGL2RenderingContext,
-                                     location: WebGLUniformLocation,
-                                     value: mat4) {
+                                    location: WebGLUniformLocation,
+                                    value: mat4) {
     gl.uniformMatrix4fv(location, false, value);
 }
 
@@ -65,14 +65,14 @@ export function setUniformMatrix3fv(gl: WebGL2RenderingContext,
 }
 
 export function setUniform3fv(gl: WebGL2RenderingContext,
-                             location: WebGLUniformLocation,
-                             value: vec3) {
+                              location: WebGLUniformLocation,
+                              value: vec3) {
     gl.uniform3fv(location, value);
 }
 
 export function setUniform1f(gl: WebGL2RenderingContext,
-                              location: WebGLUniformLocation,
-                              value: number) {
+                             location: WebGLUniformLocation,
+                             value: number) {
     gl.uniform1f(location, value);
 }
 
