@@ -50,15 +50,18 @@ async function getTextures(): Promise<HTMLImageElement[]> {
 
         loadTexture('/textures/sun.jpg'),
         loadTexture('/textures/mercury.jpg'),
-        loadTexture('/textures/venus.jpg'),
+        loadTexture('/textures/venus_diffuse_map.jpg'),
+        loadTexture('/textures/venus_normal_map.png'),
         loadTexture('/textures/earth_day_diffuse_map.jpg'),
         loadTexture('/textures/earth_specular_map.jpg'),
+        loadTexture('/textures/earth_normal_map3.jpg'),
         loadTexture('/textures/mars.jpg'),
 
         loadTexture('/textures/container_diffuse.png'),
         loadTexture('/textures/container_specular.png'),
 
         loadTexture('/textures/none_specular_map.jpg'),
+        loadTexture('/textures/flat_normal_map.jpg'),
 
         loadTexture('/textures/space_ship_test_color.png')
     ]);

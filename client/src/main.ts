@@ -24,8 +24,9 @@ getResources().then(([[
     lightingVertexShaderSource, lightingFragmentShaderSource
 ], [
     bluespaceBackImage, bluespaceBottomImage, bluespaceFrontImage, bluespaceLeftImage, bluespaceRightImage, bluespaceTopImage,
-    sunImage, mercuryImage, venusImage, earthDayDiffuseMapImage, earthSpecularMapImage, marsImage,
-    diffuseImage, specularImage, noneSpecularImage,
+    sunImage, mercuryImage, venusDiffuseMapImage, venusNormalMapImage,
+    earthDayDiffuseMapImage, earthSpecularMapImage, earthNormalMapImage,
+    marsImage, diffuseImage, specularImage, noneSpecularImage, flatNormalImage,
     spaceshipImage
 ], [
     cubeMesh, sphereMesh, spaceshipMesh
@@ -89,17 +90,17 @@ getResources().then(([[
     gl.useProgram(lightingShaderProgram);
     const lightPositionUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'uLightPosition');
     setUniform3fv(gl, lightPositionUniformLocation, lightPosition);
-    const normalMatrixUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'normalMatrix');
-    const normalMatrix = mat3.create();
-    
+
     const materialDiffuseMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.diffuse');
     setUniform1i(gl, materialDiffuseMapUniformLocation, 0);
     const materialSpecularMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.specular');
     setUniform1i(gl, materialSpecularMapUniformLocation, 1);
+    const materialNormalMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.normal');
+    setUniform1i(gl, materialNormalMapUniformLocation, 2);
     const materialShininessUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.shininess');
 
     const lightAmbientUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.ambient');
-    setUniform3fv(gl, lightAmbientUniformLocation, vec3.fromValues(0.3, 0.3, 0.3));
+    setUniform3fv(gl, lightAmbientUniformLocation, vec3.fromValues(0.05, 0.05, 0.05));
     const lightDiffuseUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.diffuse');
     setUniform3fv(gl, lightDiffuseUniformLocation, vec3.fromValues(1, 1, 1));
     const lightSpecularUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.specular');
@@ -190,6 +191,8 @@ getResources().then(([[
         8 * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
     // }
 
+    const numbersPerVertex = 14;
+
     // cube setup {
     const cube = parseObj(cubeMesh);
 
@@ -202,15 +205,23 @@ getResources().then(([[
 
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 0);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 0);
 
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
 
     gl.enableVertexAttribArray(2);
     gl.vertexAttribPointer(2, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 8 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 11 * Float32Array.BYTES_PER_ELEMENT);
     // }
 
     // sphere setup {
@@ -225,15 +236,23 @@ getResources().then(([[
 
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 0);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 0);
 
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
 
     gl.enableVertexAttribArray(2);
     gl.vertexAttribPointer(2, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 8 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 11 * Float32Array.BYTES_PER_ELEMENT);
     // }
 
     // spaceship setup {
@@ -248,25 +267,36 @@ getResources().then(([[
 
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 0);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 0);
 
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 2, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
 
     gl.enableVertexAttribArray(2);
     gl.vertexAttribPointer(2, 3, gl.FLOAT, false,
-        8 * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 8 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 11 * Float32Array.BYTES_PER_ELEMENT);
     // }
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     const noneSpecularTexture = createTexture(gl, gl.RGB, noneSpecularImage);
+    const flatNormalTexture = createTexture(gl, gl.RGB, flatNormalImage);
     const sunTexture = createTexture(gl, gl.RGB, sunImage);
     const mercuryTexture = createTexture(gl, gl.RGB, mercuryImage);
-    const venusTexture = createTexture(gl, gl.RGB, venusImage);
+    const venusDiffuseMapTexture = createTexture(gl, gl.RGB, venusDiffuseMapImage);
+    const venusNormalMapTexture = createTexture(gl, gl.RGB, venusNormalMapImage);
     const earthDayDiffuseMapTexture = createTexture(gl, gl.RGB, earthDayDiffuseMapImage);
     const earthSpecularMapTexture = createTexture(gl, gl.RGB, earthSpecularMapImage);
+    const earthNormalMapTexture = createTexture(gl, gl.RGB, earthNormalMapImage);
     const marsTexture = createTexture(gl, gl.RGB, marsImage);
 
     const diffuseMapTexture = createTexture(gl, gl.RGBA, diffuseImage);
@@ -390,7 +420,7 @@ getResources().then(([[
         mat4.rotateY(model, model, angle * 10);
         mat4.scale(model, model, [5, 5, 5]);
         setUniformMatrix4fv(gl, generalModelUniformLocation, model);
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         gl.useProgram(lightingShaderProgram);
 
@@ -399,64 +429,64 @@ getResources().then(([[
         gl.bindTexture(gl.TEXTURE_2D, mercuryTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noneSpecularTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
         mat4.identity(lightingModel);
         mat4.translate(lightingModel, lightingModel, [sin(angle * 20) * -100, 0, cos(angle * 20) * 100]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [1, 1, 1]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
-        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
         setUniform1f(gl, materialShininessUniformLocation, 1);
         setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.6, 0.6, 0.6));
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // venus
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, venusTexture);
+        gl.bindTexture(gl.TEXTURE_2D, venusDiffuseMapTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noneSpecularTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, venusNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [sin(angle * 15) * -200, 0, cos(angle * 15) * 200]);
+        mat4.translate(lightingModel, lightingModel, [-200, 0, 200]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [1.5, 1.5, 1.5]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
-        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
         setUniform1f(gl, materialShininessUniformLocation, 2);
         setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.3, 0.3, 0.3));
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // earth
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, earthDayDiffuseMapTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, earthSpecularMapTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, earthNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [sin(angle * 10) * -400, 0, cos(angle * 10) * 400]);
+        mat4.translate(lightingModel, lightingModel, [ -400, 0, 400]);
         mat4.rotateY(lightingModel, lightingModel, angle * 20);
         mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
-        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
-        setUniform1f(gl, materialShininessUniformLocation, 4);
+        setUniform1f(gl, materialShininessUniformLocation, 16);
         setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.1, 0.1, 0.1));
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // mars
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, marsTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noneSpecularTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
         mat4.identity(lightingModel);
         mat4.translate(lightingModel, lightingModel, [sin(angle * 5) * -650, 0, cos(angle * 5) * 650]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
-        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
         setUniform1f(gl, materialShininessUniformLocation, 16);
         setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.1, 0.1, 0.1));
-        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / 8);
+        gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // cube
         gl.bindVertexArray(cubeVAO);
@@ -464,6 +494,8 @@ getResources().then(([[
         gl.bindTexture(gl.TEXTURE_2D, diffuseMapTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, specularMapTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
         mat4.identity(lightingModel);
         mat4.translate(lightingModel, lightingModel, [100, 100, 100]);
         mat4.rotateX(lightingModel, lightingModel, angle * 10);
@@ -471,11 +503,9 @@ getResources().then(([[
         mat4.rotateZ(lightingModel, lightingModel, angle * 30);
         mat4.scale(lightingModel, lightingModel, [8, 8, 8]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
-        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
-        setUniform1f(gl, materialShininessUniformLocation, 64);
+        setUniform1f(gl, materialShininessUniformLocation, 256);
         setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(1, 1, 1));
-        gl.drawArrays(gl.TRIANGLES, 0, cube.length / 8);
+        gl.drawArrays(gl.TRIANGLES, 0, cube.length / numbersPerVertex);
 
         // spaceship
         gl.bindVertexArray(spaceshipVAO);
@@ -483,6 +513,8 @@ getResources().then(([[
         gl.bindTexture(gl.TEXTURE_2D, spaceshipTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noneSpecularTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
         mat4.identity(lightingModel);
         mat4.translate(lightingModel, lightingModel, [-100, 100, 100]);
         mat4.rotateX(lightingModel, lightingModel, angle * 10);
@@ -490,11 +522,9 @@ getResources().then(([[
         mat4.rotateZ(lightingModel, lightingModel, angle * 30);
         mat4.scale(lightingModel, lightingModel, [4, 4, 4]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        mat3.transpose(normalMatrix, mat3.invert(outMat3, mat3.fromMat4(outMat3, mat4.multiply(outMat4, view, lightingModel))));
-        setUniformMatrix3fv(gl, normalMatrixUniformLocation, normalMatrix);
         setUniform1f(gl, materialShininessUniformLocation, 64);
         setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(1, 1, 1));
-        gl.drawArrays(gl.TRIANGLES, 0, spaceship.length / 8);
+        gl.drawArrays(gl.TRIANGLES, 0, spaceship.length / numbersPerVertex);
 
         // motivation
         gl.activeTexture(gl.TEXTURE0);
