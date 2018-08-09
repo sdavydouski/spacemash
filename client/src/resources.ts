@@ -7,7 +7,9 @@ async function getShaders(): Promise<string[]> {
         skymapVertexShaderResponse,
         skymapFragmentShaderResponse,
         lightingVertexShaderResponse,
-        lightingFragmentShaderResponse
+        lightingFragmentShaderResponse,
+        postprocessingVertexShaderResponse,
+        postprocessingFragmentShaderResponse
     ] = await Promise.all([
         fetch('/shaders/grid/grid.vert'),
         fetch('/shaders/grid/grid.frag'),
@@ -16,7 +18,9 @@ async function getShaders(): Promise<string[]> {
         fetch('/shaders/skymap/skymap.vert'),
         fetch('/shaders/skymap/skymap.frag'),
         fetch('/shaders/lighting/lighting.vert'),
-        fetch('/shaders/lighting/lighting.frag')
+        fetch('/shaders/lighting/lighting.frag'),
+        fetch('/shaders/postprocessing/postprocessing.vert'),
+        fetch('/shaders/postprocessing/postprocessing.frag')
     ]);
 
     return await Promise.all([
@@ -27,7 +31,9 @@ async function getShaders(): Promise<string[]> {
         skymapVertexShaderResponse.text(),
         skymapFragmentShaderResponse.text(),
         lightingVertexShaderResponse.text(),
-        lightingFragmentShaderResponse.text()
+        lightingFragmentShaderResponse.text(),
+        postprocessingVertexShaderResponse.text(),
+        postprocessingFragmentShaderResponse.text()
     ]);
 }
 
@@ -49,13 +55,15 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/skymaps/blue/bkg1_top.png'),
 
         loadTexture('/textures/sun.jpg'),
-        loadTexture('/textures/mercury.jpg'),
+        loadTexture('/textures/mercury_diffuse_map.jpg'),
+        loadTexture('/textures/mercury_normal_map.png'),
         loadTexture('/textures/venus_diffuse_map.jpg'),
         loadTexture('/textures/venus_normal_map.png'),
         loadTexture('/textures/earth_day_diffuse_map.jpg'),
         loadTexture('/textures/earth_specular_map.jpg'),
-        loadTexture('/textures/earth_normal_map3.jpg'),
-        loadTexture('/textures/mars.jpg'),
+        loadTexture('/textures/earth_normal_map.jpg'),
+        loadTexture('/textures/mars_diffuse_map.jpg'),
+        loadTexture('/textures/mars_normal_map.png'),
 
         loadTexture('/textures/container_diffuse.png'),
         loadTexture('/textures/container_specular.png'),

@@ -6,6 +6,7 @@ type UV = [number, number];
 type Normal = [number, number, number];
 
 // todo: indexing
+// todo: smooth tangent / bitangent vectors
 export function parseObj(obj: string): Float32Array {
     const vertices: Array<number> = [];
 

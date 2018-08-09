@@ -21,12 +21,13 @@ getResources().then(([[
     gridVertexShaderSource, gridFragmentShaderSource,
     generalVertexShaderSource, generalFragmentShaderSource,
     skymapVertexShaderSource, skymapFragmentShaderSource,
-    lightingVertexShaderSource, lightingFragmentShaderSource
+    lightingVertexShaderSource, lightingFragmentShaderSource,
+    postprocessingVertexShaderSource, postprocessingFragmentShaderSource
 ], [
     bluespaceBackImage, bluespaceBottomImage, bluespaceFrontImage, bluespaceLeftImage, bluespaceRightImage, bluespaceTopImage,
-    sunImage, mercuryImage, venusDiffuseMapImage, venusNormalMapImage,
+    sunImage, mercuryDiffuseMapImage, mercuryNormalMapImage, venusDiffuseMapImage, venusNormalMapImage,
     earthDayDiffuseMapImage, earthSpecularMapImage, earthNormalMapImage,
-    marsImage, diffuseImage, specularImage, noneSpecularImage, flatNormalImage,
+    marsDiffuseMapImage, marsNormalMapImage, diffuseImage, specularImage, noneSpecularImage, flatNormalImage,
     spaceshipImage
 ], [
     cubeMesh, sphereMesh, spaceshipMesh
@@ -111,6 +112,10 @@ getResources().then(([[
     setUniform1f(gl, lightLinearAttenuationUniformLocation, 0.0004);
     const lightQuadraticAttenuationUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.quadratic');
     setUniform1f(gl, lightQuadraticAttenuationUniformLocation, 0.000002);
+
+    const postprocessingVertexShader = createShader(gl, postprocessingVertexShaderSource, gl.VERTEX_SHADER);
+    const postprocessingFramentShader = createShader(gl, postprocessingFragmentShaderSource, gl.FRAGMENT_SHADER);
+    const postprocessingShaderProgram = createProgram(gl, postprocessingVertexShader, postprocessingFramentShader);
 
     const projection = mat4.create();
     const view = mat4.create();
@@ -291,13 +296,15 @@ getResources().then(([[
     const noneSpecularTexture = createTexture(gl, gl.RGB, noneSpecularImage);
     const flatNormalTexture = createTexture(gl, gl.RGB, flatNormalImage);
     const sunTexture = createTexture(gl, gl.RGB, sunImage);
-    const mercuryTexture = createTexture(gl, gl.RGB, mercuryImage);
+    const mercuryDiffuseMapTexture = createTexture(gl, gl.RGB, mercuryDiffuseMapImage);
+    const mercuryNormalMapTexture = createTexture(gl, gl.RGB, mercuryNormalMapImage);
     const venusDiffuseMapTexture = createTexture(gl, gl.RGB, venusDiffuseMapImage);
     const venusNormalMapTexture = createTexture(gl, gl.RGB, venusNormalMapImage);
     const earthDayDiffuseMapTexture = createTexture(gl, gl.RGB, earthDayDiffuseMapImage);
     const earthSpecularMapTexture = createTexture(gl, gl.RGB, earthSpecularMapImage);
     const earthNormalMapTexture = createTexture(gl, gl.RGB, earthNormalMapImage);
-    const marsTexture = createTexture(gl, gl.RGB, marsImage);
+    const marsDiffuseMapTexture = createTexture(gl, gl.RGB, marsDiffuseMapImage);
+    const marsNormalMapTexture = createTexture(gl, gl.RGB, marsNormalMapImage);
 
     const diffuseMapTexture = createTexture(gl, gl.RGBA, diffuseImage);
     const specularMapTexture = createTexture(gl, gl.RGBA, specularImage);
@@ -372,6 +379,30 @@ getResources().then(([[
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     }
 
+    const FBO = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, FBO);
+
+    const colorBufferTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, colorBufferTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, screenWidth, screenHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorBufferTexture, 0);
+
+    const RBO = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, RBO);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, screenWidth, screenHeight);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, RBO);
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+        console.warn('Framebuffer is not complete');
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     let lastTime = 0;
     function gameLoop() {
@@ -387,9 +418,12 @@ getResources().then(([[
 
     let angle = 0;
 
-    gl.clearColor(0, 0, 0, 1);
     function render(delta: number) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, FBO);
+
+        gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
 
         gl.bindBuffer(gl.UNIFORM_BUFFER, UBO);
         mat4.perspective(projection, toRadians(fov), screenWidth / screenHeight, 0.1, 10000);
@@ -426,13 +460,13 @@ getResources().then(([[
 
         // mercury
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, mercuryTexture);
+        gl.bindTexture(gl.TEXTURE_2D, mercuryDiffuseMapTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noneSpecularTexture);
         gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
+        gl.bindTexture(gl.TEXTURE_2D, mercuryNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [sin(angle * 20) * -100, 0, cos(angle * 20) * 100]);
+        mat4.translate(lightingModel, lightingModel, [-100, 0, 100]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [1, 1, 1]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
@@ -474,13 +508,13 @@ getResources().then(([[
 
         // mars
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, marsTexture);
+        gl.bindTexture(gl.TEXTURE_2D, marsDiffuseMapTexture);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, noneSpecularTexture);
         gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
+        gl.bindTexture(gl.TEXTURE_2D, marsNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [sin(angle * 5) * -650, 0, cos(angle * 5) * 650]);
+        mat4.translate(lightingModel, lightingModel, [-650, 0, 650]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
         setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
@@ -549,6 +583,19 @@ getResources().then(([[
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, bluespaceSkymapTexture);
         gl.drawArrays(gl.TRIANGLES, 0, 36);
         gl.depthFunc(gl.LESS);
+
+
+        // rendering to the screen
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.clearColor(0, 1, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(postprocessingShaderProgram);
+        gl.bindVertexArray(quadVAO);
+        gl.disable(gl.DEPTH_TEST);
+        gl.bindTexture(gl.TEXTURE_2D, colorBufferTexture);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+
 
         updateUI([camera.position, camera.direction]);
     }
