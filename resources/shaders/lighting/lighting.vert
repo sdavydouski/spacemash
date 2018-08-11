@@ -24,13 +24,13 @@ void main() {
 
     uv = in_uv;
 
-    vec3 T = normalize(vec3(viewModel * vec4(tangent, 0.0f)));
-    vec3 B = normalize(vec3(viewModel * vec4(bitangent, 0.0f)));
-    vec3 N = normalize(vec3(viewModel * vec4(normal, 0.0f)));
+    vec3 T = normalize(vec3(viewModel * vec4(tangent, 0.f)));
+    vec3 B = normalize(vec3(viewModel * vec4(bitangent, 0.f)));
+    vec3 N = normalize(vec3(viewModel * vec4(normal, 0.f)));
     TBN = mat3(T, B, N);
 
     lightPosition = vec3(view * vec4(uLightPosition, 1.f));
     fragmentPosition = vec3(viewModel * vec4(position, 1.f));
 
-    gl_Position = projection * viewModel * vec4(position, 1.0f);
+    gl_Position = projection * viewModel * vec4(position, 1.f);
 }

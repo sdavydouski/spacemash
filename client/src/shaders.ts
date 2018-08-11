@@ -1,6 +1,6 @@
 import {mat3, mat4, vec3} from 'gl-matrix';
 
-export function createShader(gl: WebGL2RenderingContext, source: string, type: number): WebGLShader {
+function _createShader(gl: WebGL2RenderingContext, source: string, type: number): WebGLShader {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
@@ -15,9 +15,9 @@ export function createShader(gl: WebGL2RenderingContext, source: string, type: n
     return shader;
 }
 
-export function createProgram(gl: WebGL2RenderingContext,
-                              vertexShader: WebGLShader,
-                              fragmentShader: WebGLShader): WebGLProgram {
+function _createProgram(gl: WebGL2RenderingContext,
+                        vertexShader: WebGLShader,
+                        fragmentShader: WebGLShader): WebGLProgram {
     const shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
@@ -40,10 +40,50 @@ export function createProgram(gl: WebGL2RenderingContext,
     return shaderProgram;
 }
 
+export interface ShaderProgram {
+    program: WebGLProgram,
+    uniforms: ShaderUniforms
+}
+
+interface ShaderUniforms {
+    [name: string]: WebGLUniformLocation
+}
+
+export function createProgram(gl: WebGL2RenderingContext,
+                              vertexShaderSource: string,
+                              fragmentShaderSource: string): ShaderProgram {
+    const vertexShader = _createShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+    const fragmentShader = _createShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+    const program = _createProgram(gl, vertexShader, fragmentShader);
+
+    const uniformsCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+    const uniforms: ShaderUniforms = {};
+    for (let i = 0; i < uniformsCount; ++i) {
+        const info = gl.getActiveUniform(program, i);
+
+        if (info.name !== 'projection' && info.name !== 'view') {
+            uniforms[info.name] = getUniformLocation(gl, program, info.name);
+        }
+    }
+
+    return {
+        program,
+        uniforms
+    };
+}
+
+export function bindUniformBlock(gl: WebGL2RenderingContext,
+                                 program: WebGLProgram,
+                                 uniformBlockName: string,
+                                 uniformBlockBinding: number) {
+    const uniformBlockIndex = gl.getUniformBlockIndex(program, uniformBlockName);
+    gl.uniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+}
+
 export function getUniformLocation(gl: WebGL2RenderingContext,
-                                   shaderProgram: WebGLProgram,
+                                   program: WebGLProgram,
                                    name: string): WebGLUniformLocation {
-    const location = gl.getUniformLocation(shaderProgram, name);
+    const location = gl.getUniformLocation(program, name);
 
     if (!location) {
         console.warn(`Uniform ${name} either doesn't exist or isn't used`);

@@ -7,7 +7,8 @@ in vec3 fragmentPosition;
 in vec3 lightPosition;
 in mat3 TBN;
 
-out vec4 finalColor;
+layout (location = 0) out vec4 fragmentColor;
+layout (location = 1) out vec4 brightnessColor;
 
 struct Material {
     sampler2D diffuse;
@@ -31,9 +32,7 @@ uniform Material material;
 uniform Light light;
 
 void main() {
-    float gamma = 2.2;
-
-    vec3 diffuseColor = pow(texture(material.diffuse, uv).rgb, vec3(gamma));    // sRGB -> RGB
+    vec3 diffuseColor = texture(material.diffuse, uv).rgb;
     vec3 specularIntensity = vec3(texture(material.specular, uv));
 
     float distance = length(lightPosition - fragmentPosition);
@@ -68,8 +67,11 @@ void main() {
 
     vec3 result = (ambient + diffuse + specular) * attenuation;
 
-    finalColor = vec4(result, 1.f);
+    fragmentColor = vec4(result, 1.f);
 
-    // apply gamma-correction (RGB -> sRGB)
-    finalColor.rgb = pow(finalColor.rgb, vec3(1.f / gamma));
+    // check whether fragment output is higher than threshold, if so output as brightness color
+    float brightness = dot(fragmentColor.rgb, vec3(0.2126f, 0.7152f, 0.0722f));
+    brightnessColor = brightness > 1.f ?
+        vec4(fragmentColor.rgb, 1.0f) :
+        vec4(0.0f, 0.0f, 0.0f, 1.0f);
 }

@@ -1,16 +1,16 @@
-import {mat3, mat4, vec3} from 'gl-matrix';
+import {mat4, vec3} from 'gl-matrix';
 import {getContext} from './gl';
 import {getResources} from './resources';
 import {
+    bindUniformBlock,
     createProgram,
-    createShader,
-    getUniformLocation, setUniform1f, setUniform1i, setUniform3fv, setUniformMatrix3fv,
+    setUniform1f, setUniform1i, setUniform3fv,
     setUniformMatrix4fv
 } from './shaders';
-import {clamp, cos, outMat3, outMat4, sin, toRadians} from './math';
+import {clamp, toRadians} from './math';
 import {createCamera} from './camera';
 import {updateUI} from './ui';
-import {createSkymap, createTexture} from './textures';
+import {createSkymap, createTexture, createTextureWithDimensions} from './textures';
 import {parseObj} from './objLoader';
 
 const pressedKeys: {
@@ -21,8 +21,10 @@ getResources().then(([[
     gridVertexShaderSource, gridFragmentShaderSource,
     generalVertexShaderSource, generalFragmentShaderSource,
     skymapVertexShaderSource, skymapFragmentShaderSource,
+    lightVertexShaderSource, lightFragmentShaderSource,
     lightingVertexShaderSource, lightingFragmentShaderSource,
-    postprocessingVertexShaderSource, postprocessingFragmentShaderSource
+    blurVertexShaderSource, blurHorizontalFragmentShaderSource, blurVerticalFragmentShaderSource,
+    finalVertexShaderSource, finalFragmentShaderSource
 ], [
     bluespaceBackImage, bluespaceBottomImage, bluespaceFrontImage, bluespaceLeftImage, bluespaceRightImage, bluespaceTopImage,
     sunImage, mercuryDiffuseMapImage, mercuryNormalMapImage, venusDiffuseMapImage, venusNormalMapImage,
@@ -52,70 +54,48 @@ getResources().then(([[
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
     gl.enable(gl.DEPTH_TEST);
 
     const transformationsBindingIndex = 0;
 
-    const gridVertexShader = createShader(gl, gridVertexShaderSource, gl.VERTEX_SHADER);
-    const gridFragmentShader = createShader(gl, gridFragmentShaderSource, gl.FRAGMENT_SHADER);
-    const gridShaderProgram = createProgram(gl, gridVertexShader, gridFragmentShader);
-    const gridUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
-    gl.uniformBlockBinding(gridShaderProgram, gridUniformBlockIndex, transformationsBindingIndex);
+    const gridShader = createProgram(gl, gridVertexShaderSource, gridFragmentShaderSource);
+    bindUniformBlock(gl, gridShader.program, 'transformations', transformationsBindingIndex);
 
-    const generalVertexShader = createShader(gl, generalVertexShaderSource, gl.VERTEX_SHADER);
-    const generalFragmentShader = createShader(gl, generalFragmentShaderSource, gl.FRAGMENT_SHADER);
-    const generalShaderProgram = createProgram(gl, generalVertexShader, generalFragmentShader);
-    const generalUniformBlockIndex = gl.getUniformBlockIndex(gridShaderProgram, 'transformations');
-    gl.uniformBlockBinding(generalShaderProgram, generalUniformBlockIndex, transformationsBindingIndex);
+    const generalShader = createProgram(gl, generalVertexShaderSource, generalFragmentShaderSource);
+    bindUniformBlock(gl, generalShader.program, 'transformations', transformationsBindingIndex);
 
-    const skymapVertexShader = createShader(gl, skymapVertexShaderSource, gl.VERTEX_SHADER);
-    const skymapFragmentShader = createShader(gl, skymapFragmentShaderSource, gl.FRAGMENT_SHADER);
-    const skymapShaderProgram = createProgram(gl, skymapVertexShader, skymapFragmentShader);
-    const skymapUniformBlockIndex = gl.getUniformBlockIndex(skymapShaderProgram, 'transformations');
-    gl.uniformBlockBinding(skymapShaderProgram, skymapUniformBlockIndex, transformationsBindingIndex);
+    const skymapShader = createProgram(gl, skymapVertexShaderSource, skymapFragmentShaderSource);
+    bindUniformBlock(gl, skymapShader.program, 'transformations', transformationsBindingIndex);
+    const generalModel = mat4.create();
 
-    const generalModelUniformLocation = getUniformLocation(gl, generalShaderProgram, 'model');
-    const model = mat4.create();
+    const lightShader = createProgram(gl, lightVertexShaderSource, lightFragmentShaderSource);
+    bindUniformBlock(gl, lightShader.program, 'transformations', transformationsBindingIndex);
+    gl.useProgram(lightShader.program);
+    const lightModel = mat4.create();
+    setUniform1f(gl, lightShader.uniforms['lightBrightness'], 4);
 
-    const lightingVertexShader = createShader(gl, lightingVertexShaderSource, gl.VERTEX_SHADER);
-    const lightingFragmentShader = createShader(gl, lightingFragmentShaderSource, gl.FRAGMENT_SHADER);
-    const lightingShaderProgram = createProgram(gl, lightingVertexShader, lightingFragmentShader);
-    const lightingUniformBlockIndex = gl.getUniformBlockIndex(lightingShaderProgram, 'transformations');
-    gl.uniformBlockBinding(lightingShaderProgram, lightingUniformBlockIndex, transformationsBindingIndex);
-    const lightingModelUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'model');
+    const lightingShader = createProgram(gl, lightingVertexShaderSource, lightingFragmentShaderSource);
+    bindUniformBlock(gl, lightingShader.program, 'transformations', transformationsBindingIndex);
+    gl.useProgram(lightingShader.program);
     const lightingModel = mat4.create();
-
     const lightPosition = vec3.fromValues(0, 0, 0);
+    setUniform3fv(gl, lightingShader.uniforms['uLightPosition'], lightPosition);
+    setUniform1i(gl, lightingShader.uniforms['material.diffuse'], 0);
+    setUniform1i(gl, lightingShader.uniforms['material.specular'], 1);
+    setUniform1i(gl, lightingShader.uniforms['material.normal'], 2);
+    setUniform3fv(gl, lightingShader.uniforms['light.ambient'], vec3.fromValues(0.2, 0.2, 0.2));
+    setUniform3fv(gl, lightingShader.uniforms['light.diffuse'], vec3.fromValues(1, 1, 1));
+    setUniform1f(gl, lightingShader.uniforms['light.constant'], 1);
+    setUniform1f(gl, lightingShader.uniforms['light.linear'], 0.0004);
+    setUniform1f(gl, lightingShader.uniforms['light.quadratic'], 0.000002);
 
-    gl.useProgram(lightingShaderProgram);
-    const lightPositionUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'uLightPosition');
-    setUniform3fv(gl, lightPositionUniformLocation, lightPosition);
+    const blurHorizontalShader = createProgram(gl, blurVertexShaderSource, blurHorizontalFragmentShaderSource);
+    const blurVerticalShader = createProgram(gl, blurVertexShaderSource, blurVerticalFragmentShaderSource);
 
-    const materialDiffuseMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.diffuse');
-    setUniform1i(gl, materialDiffuseMapUniformLocation, 0);
-    const materialSpecularMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.specular');
-    setUniform1i(gl, materialSpecularMapUniformLocation, 1);
-    const materialNormalMapUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.normal');
-    setUniform1i(gl, materialNormalMapUniformLocation, 2);
-    const materialShininessUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'material.shininess');
-
-    const lightAmbientUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.ambient');
-    setUniform3fv(gl, lightAmbientUniformLocation, vec3.fromValues(0.05, 0.05, 0.05));
-    const lightDiffuseUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.diffuse');
-    setUniform3fv(gl, lightDiffuseUniformLocation, vec3.fromValues(1, 1, 1));
-    const lightSpecularUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.specular');
-
-    const lightConstantAttenuationUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.constant');
-    setUniform1f(gl, lightConstantAttenuationUniformLocation, 1);
-    const lightLinearAttenuationUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.linear');
-    setUniform1f(gl, lightLinearAttenuationUniformLocation, 0.0004);
-    const lightQuadraticAttenuationUniformLocation = getUniformLocation(gl, lightingShaderProgram, 'light.quadratic');
-    setUniform1f(gl, lightQuadraticAttenuationUniformLocation, 0.000002);
-
-    const postprocessingVertexShader = createShader(gl, postprocessingVertexShaderSource, gl.VERTEX_SHADER);
-    const postprocessingFramentShader = createShader(gl, postprocessingFragmentShaderSource, gl.FRAGMENT_SHADER);
-    const postprocessingShaderProgram = createProgram(gl, postprocessingVertexShader, postprocessingFramentShader);
+    const finalShader = createProgram(gl, finalVertexShaderSource, finalFragmentShaderSource);
+    gl.useProgram(finalShader.program);
+    setUniform1i(gl, finalShader.uniforms['scene'], 0);
+    setUniform1i(gl, finalShader.uniforms['bloomBlur'], 1);
 
     const projection = mat4.create();
     const view = mat4.create();
@@ -293,23 +273,22 @@ getResources().then(([[
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    const noneSpecularTexture = createTexture(gl, gl.RGB, noneSpecularImage);
-    const flatNormalTexture = createTexture(gl, gl.RGB, flatNormalImage);
-    const sunTexture = createTexture(gl, gl.RGB, sunImage);
-    const mercuryDiffuseMapTexture = createTexture(gl, gl.RGB, mercuryDiffuseMapImage);
-    const mercuryNormalMapTexture = createTexture(gl, gl.RGB, mercuryNormalMapImage);
-    const venusDiffuseMapTexture = createTexture(gl, gl.RGB, venusDiffuseMapImage);
-    const venusNormalMapTexture = createTexture(gl, gl.RGB, venusNormalMapImage);
-    const earthDayDiffuseMapTexture = createTexture(gl, gl.RGB, earthDayDiffuseMapImage);
-    const earthSpecularMapTexture = createTexture(gl, gl.RGB, earthSpecularMapImage);
-    const earthNormalMapTexture = createTexture(gl, gl.RGB, earthNormalMapImage);
-    const marsDiffuseMapTexture = createTexture(gl, gl.RGB, marsDiffuseMapImage);
-    const marsNormalMapTexture = createTexture(gl, gl.RGB, marsNormalMapImage);
+    const noneSpecularTexture = createTexture(gl, noneSpecularImage, gl.RGB, gl.RGB);
+    const flatNormalTexture = createTexture(gl, flatNormalImage, gl.RGB, gl.RGB);
+    const sunTexture = createTexture(gl, sunImage, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, true);
+    const mercuryDiffuseMapTexture = createTexture(gl, mercuryDiffuseMapImage, gl.RGB, gl.RGB);
+    const mercuryNormalMapTexture = createTexture(gl, mercuryNormalMapImage, gl.RGB, gl.RGB);
+    const venusDiffuseMapTexture = createTexture(gl, venusDiffuseMapImage, gl.RGB, gl.RGB);
+    const venusNormalMapTexture = createTexture(gl, venusNormalMapImage, gl.RGB, gl.RGB);
+    const earthDayDiffuseMapTexture = createTexture(gl, earthDayDiffuseMapImage, gl.RGB, gl.RGB);
+    const earthSpecularMapTexture = createTexture(gl, earthSpecularMapImage, gl.RGB, gl.RGB);
+    const earthNormalMapTexture = createTexture(gl, earthNormalMapImage, gl.RGB, gl.RGB);
+    const marsDiffuseMapTexture = createTexture(gl, marsDiffuseMapImage, gl.RGB, gl.RGB);
+    const marsNormalMapTexture = createTexture(gl, marsNormalMapImage, gl.RGB, gl.RGB);
 
-    const diffuseMapTexture = createTexture(gl, gl.RGBA, diffuseImage);
-    const specularMapTexture = createTexture(gl, gl.RGBA, specularImage);
-
-    const spaceshipTexture = createTexture(gl, gl.RGBA, spaceshipImage);
+    const diffuseMapTexture = createTexture(gl, diffuseImage);
+    const specularMapTexture = createTexture(gl, specularImage);
+    const spaceshipTexture = createTexture(gl, spaceshipImage);
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
@@ -336,67 +315,76 @@ getResources().then(([[
     }, true);
 
     video.src = '/video/motivation.mp4';
+    // noinspection JSIgnoredPromiseFromCall
     video.play();
-
-    const videoTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, videoTexture);
 
     // Because video has to be download over the internet
     // they might take a moment until it's ready so
     // put a single pixel in the texture so we can
     // use it immediately.
-    const level = 0;
-    const internalFormat = gl.RGBA;
-    const width = 1;
-    const height = 1;
-    const border = 0;
-    const srcFormat = gl.RGBA;
-    const srcType = gl.UNSIGNED_BYTE;
     const pixel = new Uint8Array([0, 255, 0, 255]);  // opaque green
-    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-        width, height, border, srcFormat, srcType,
-        pixel);
-
-    // Turn off mips and set  wrapping to clamp to edge so it
-    // will work regardless of the dimensions of the video.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    const videoTexture = createTextureWithDimensions(gl, pixel, 1, 1);
 
     function updateVideoTexture(gl: WebGL2RenderingContext,
                                 texture: WebGLTexture,
                                 video: HTMLVideoElement) {
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-        const level = 0;
         const internalFormat = gl.RGBA;
         const srcFormat = gl.RGBA;
         const srcType = gl.UNSIGNED_BYTE;
         // WebGL knows how to pull the current frame out of the video and use it as a texture
-        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+        gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat,
             srcFormat, srcType, video);
 
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     }
 
-    const FBO = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, FBO);
+    if (!gl.getExtension('EXT_color_buffer_float')) {
+        console.warn('need EXT_color_buffer_float extension');
+    }
+    
+    const hdrFBO = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, hdrFBO);
 
-    const colorBufferTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, colorBufferTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, screenWidth, screenHeight, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.bindTexture(gl.TEXTURE_2D, null);
+    const hdrBufferTexture = createTextureWithDimensions(gl, null, screenWidth, screenHeight,
+        gl.RGBA16F, gl.RGBA, gl.FLOAT);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, hdrBufferTexture, 0);
 
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorBufferTexture, 0);
+    const blurBufferTexture = createTextureWithDimensions(gl, null, screenWidth, screenHeight,
+        gl.RGBA16F, gl.RGBA, gl.FLOAT);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, blurBufferTexture, 0);
 
     const RBO = gl.createRenderbuffer();
     gl.bindRenderbuffer(gl.RENDERBUFFER, RBO);
     gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, screenWidth, screenHeight);
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, RBO);
+
+    gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1]);
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+        console.warn('Framebuffer is not complete');
+    }
+
+    const blurRegionWidth = 512;
+    const blurRegionHeight = 512;
+
+    const pingpongFBO1 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pingpongFBO1);
+    const pingpongBuffer1 = createTextureWithDimensions(gl, null, blurRegionWidth, blurRegionHeight,
+        gl.RGBA16F, gl.RGBA, gl.FLOAT);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pingpongBuffer1, 0);
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+        console.warn('Framebuffer is not complete');
+    }
+
+    const pingpongFBO2 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, pingpongFBO2);
+    const pingpongBuffer2 = createTextureWithDimensions(gl, null, blurRegionWidth, blurRegionHeight,
+        gl.RGBA16F, gl.RGBA, gl.FLOAT);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pingpongBuffer2, 0);
 
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
         console.warn('Framebuffer is not complete');
@@ -419,7 +407,7 @@ getResources().then(([[
     let angle = 0;
 
     function render(delta: number) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, FBO);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, hdrFBO);
 
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -442,21 +430,21 @@ getResources().then(([[
         // sun
         gl.bindVertexArray(sphereVAO);
 
-        // gl.useProgram(lightingShaderProgram);
+        // gl.useProgram(lightingShader);
         // vec3.copy(lightPosition, [sin(-angle * 50) * 150, 10, cos(angle * 50) * 150]);
         // setUniform3fv(gl, lightPositionUniformLocation, lightPosition);
 
-        gl.useProgram(generalShaderProgram);
+        gl.useProgram(lightShader.program);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, sunTexture);
-        mat4.identity(model);
-        mat4.translate(model, model, lightPosition);
-        mat4.rotateY(model, model, angle * 10);
-        mat4.scale(model, model, [5, 5, 5]);
-        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        mat4.identity(lightModel);
+        mat4.translate(lightModel, lightModel, lightPosition);
+        mat4.rotateY(lightModel, lightModel, angle * 10);
+        mat4.scale(lightModel, lightModel, [5, 5, 5]);
+        setUniformMatrix4fv(gl, lightShader.uniforms['model'], lightModel);
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
-        gl.useProgram(lightingShaderProgram);
+        gl.useProgram(lightingShader.program);
 
         // mercury
         gl.activeTexture(gl.TEXTURE0);
@@ -469,9 +457,9 @@ getResources().then(([[
         mat4.translate(lightingModel, lightingModel, [-100, 0, 100]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [1, 1, 1]);
-        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        setUniform1f(gl, materialShininessUniformLocation, 1);
-        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.6, 0.6, 0.6));
+        setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
+        setUniform1f(gl, lightingShader.uniforms['material.shininess'], 1);
+        setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(0.6, 0.6, 0.6));
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // venus
@@ -485,9 +473,9 @@ getResources().then(([[
         mat4.translate(lightingModel, lightingModel, [-200, 0, 200]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [1.5, 1.5, 1.5]);
-        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        setUniform1f(gl, materialShininessUniformLocation, 2);
-        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.3, 0.3, 0.3));
+        setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
+        setUniform1f(gl, lightingShader.uniforms['material.shininess'], 2);
+        setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(0.3, 0.3, 0.3));
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // earth
@@ -501,9 +489,9 @@ getResources().then(([[
         mat4.translate(lightingModel, lightingModel, [ -400, 0, 400]);
         mat4.rotateY(lightingModel, lightingModel, angle * 20);
         mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
-        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        setUniform1f(gl, materialShininessUniformLocation, 16);
-        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.1, 0.1, 0.1));
+        setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
+        setUniform1f(gl, lightingShader.uniforms['material.shininess'], 16);
+        setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(0.1, 0.1, 0.1));
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // mars
@@ -517,9 +505,9 @@ getResources().then(([[
         mat4.translate(lightingModel, lightingModel, [-650, 0, 650]);
         mat4.rotateY(lightingModel, lightingModel, angle * 50);
         mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
-        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        setUniform1f(gl, materialShininessUniformLocation, 16);
-        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(0.1, 0.1, 0.1));
+        setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
+        setUniform1f(gl, lightingShader.uniforms['material.shininess'], 16);
+        setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(0.1, 0.1, 0.1));
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
 
         // cube
@@ -536,9 +524,9 @@ getResources().then(([[
         mat4.rotateY(lightingModel, lightingModel, angle * 20);
         mat4.rotateZ(lightingModel, lightingModel, angle * 30);
         mat4.scale(lightingModel, lightingModel, [8, 8, 8]);
-        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        setUniform1f(gl, materialShininessUniformLocation, 256);
-        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(1, 1, 1));
+        setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
+        setUniform1f(gl, lightingShader.uniforms['material.shininess'], 256);
+        setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(1, 1, 1));
         gl.drawArrays(gl.TRIANGLES, 0, cube.length / numbersPerVertex);
 
         // spaceship
@@ -555,12 +543,13 @@ getResources().then(([[
         mat4.rotateY(lightingModel, lightingModel, angle * 20);
         mat4.rotateZ(lightingModel, lightingModel, angle * 30);
         mat4.scale(lightingModel, lightingModel, [4, 4, 4]);
-        setUniformMatrix4fv(gl, lightingModelUniformLocation, lightingModel);
-        setUniform1f(gl, materialShininessUniformLocation, 64);
-        setUniform3fv(gl, lightSpecularUniformLocation, vec3.fromValues(1, 1, 1));
+        setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
+        setUniform1f(gl, lightingShader.uniforms['material.shininess'], 64);
+        setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(1, 1, 1));
         gl.drawArrays(gl.TRIANGLES, 0, spaceship.length / numbersPerVertex);
 
         // motivation
+        gl.useProgram(generalShader.program);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, videoTexture);
 
@@ -569,33 +558,50 @@ getResources().then(([[
         }
 
         gl.bindVertexArray(quadVAO);
-        gl.useProgram(generalShaderProgram);
-        mat4.identity(model);
-        mat4.translate(model, model, [0, 500, -2000]);
-        mat4.scale(model, model, [1000, 500, 500]);
-        setUniformMatrix4fv(gl, generalModelUniformLocation, model);
+        mat4.identity(generalModel);
+        mat4.translate(generalModel, generalModel, [0, 500, -2000]);
+        mat4.scale(generalModel, generalModel, [1000, 500, 500]);
+        setUniformMatrix4fv(gl, generalShader.uniforms['model'], generalModel);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
         // skymap
         gl.bindVertexArray(cubeVAO);
         gl.depthFunc(gl.LEQUAL);
-        gl.useProgram(skymapShaderProgram);
+        gl.useProgram(skymapShader.program);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, bluespaceSkymapTexture);
         gl.drawArrays(gl.TRIANGLES, 0, 36);
         gl.depthFunc(gl.LESS);
 
+        // blurring
+        gl.viewport(0, 0, blurRegionWidth, blurRegionHeight);
+        const amount = 5;
+        let horizontal = true;
+        gl.bindVertexArray(quadVAO);
+        for (let i = 0; i < amount; ++i) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, horizontal ? pingpongFBO1 : pingpongFBO2);
+            gl.useProgram(horizontal ? blurHorizontalShader.program : blurVerticalShader.program);
+            if (i === 0) {
+                gl.bindTexture(gl.TEXTURE_2D, blurBufferTexture);
+            } else {
+                gl.bindTexture(gl.TEXTURE_2D, horizontal ? pingpongBuffer2 : pingpongBuffer1);
+            }
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            horizontal = !horizontal;
+        }
 
-        // rendering to the screen
+        // final render to the screen
+        gl.viewport(0, 0, screenWidth, screenHeight);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.clearColor(0, 1, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.useProgram(postprocessingShaderProgram);
         gl.bindVertexArray(quadVAO);
         gl.disable(gl.DEPTH_TEST);
-        gl.bindTexture(gl.TEXTURE_2D, colorBufferTexture);
+        gl.useProgram(finalShader.program);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, hdrBufferTexture);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, pingpongBuffer1);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-
 
         updateUI([camera.position, camera.direction]);
     }

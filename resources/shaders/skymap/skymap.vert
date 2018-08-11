@@ -14,6 +14,6 @@ void main() {
 
     mat4 translatelessView = view;
     translatelessView[3].xyz = vec3(0.f);
-    vec4 pos = projection * translatelessView * vec4(position, 1.0f);
+    vec4 pos = projection * translatelessView * vec4(position, 1.f);
     gl_Position = pos.xyww;
 }

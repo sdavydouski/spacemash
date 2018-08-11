@@ -1,40 +1,23 @@
 async function getShaders(): Promise<string[]> {
-    const [
-        gridVertexShaderResponse,
-        gridFragmentShaderResponse,
-        generalVertexShaderResponse,
-        generalFragmentShaderResponse,
-        skymapVertexShaderResponse,
-        skymapFragmentShaderResponse,
-        lightingVertexShaderResponse,
-        lightingFragmentShaderResponse,
-        postprocessingVertexShaderResponse,
-        postprocessingFragmentShaderResponse
-    ] = await Promise.all([
+    const shaderResponses = await Promise.all([
         fetch('/shaders/grid/grid.vert'),
         fetch('/shaders/grid/grid.frag'),
         fetch('/shaders/general/general.vert'),
         fetch('/shaders/general/general.frag'),
         fetch('/shaders/skymap/skymap.vert'),
         fetch('/shaders/skymap/skymap.frag'),
+        fetch('/shaders/light/light.vert'),
+        fetch('/shaders/light/light.frag'),
         fetch('/shaders/lighting/lighting.vert'),
         fetch('/shaders/lighting/lighting.frag'),
-        fetch('/shaders/postprocessing/postprocessing.vert'),
-        fetch('/shaders/postprocessing/postprocessing.frag')
+        fetch('/shaders/blur/blur.vert'),
+        fetch('/shaders/blur/blur_horizontal.frag'),
+        fetch('/shaders/blur/blur_vertical.frag'),
+        fetch('/shaders/final/final.vert'),
+        fetch('/shaders/final/final.frag')
     ]);
 
-    return await Promise.all([
-        gridVertexShaderResponse.text(),
-        gridFragmentShaderResponse.text(),
-        generalVertexShaderResponse.text(),
-        generalFragmentShaderResponse.text(),
-        skymapVertexShaderResponse.text(),
-        skymapFragmentShaderResponse.text(),
-        lightingVertexShaderResponse.text(),
-        lightingFragmentShaderResponse.text(),
-        postprocessingVertexShaderResponse.text(),
-        postprocessingFragmentShaderResponse.text()
-    ]);
+    return await Promise.all(shaderResponses.map(shaderResponse => shaderResponse.text()));
 }
 
 function loadTexture(url: string): Promise<HTMLImageElement> {
@@ -54,7 +37,7 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/skymaps/blue/bkg1_right.png'),
         loadTexture('/textures/skymaps/blue/bkg1_top.png'),
 
-        loadTexture('/textures/sun.jpg'),
+        loadTexture('/textures/sun2.jpg'),
         loadTexture('/textures/mercury_diffuse_map.jpg'),
         loadTexture('/textures/mercury_normal_map.png'),
         loadTexture('/textures/venus_diffuse_map.jpg'),
@@ -76,21 +59,13 @@ async function getTextures(): Promise<HTMLImageElement[]> {
 }
 
 async function getModels(): Promise<string[]> {
-    const [
-        cubeMeshResponse,
-        sphereMeshResponse,
-        spaceshipMeshResponse,
-    ] = await Promise.all([
+    const meshResponses = await Promise.all([
         fetch('/models/cube/cube.obj'),
         fetch('/models/sphere/sphere.obj'),
         fetch('/models/spaceship/spaceship.obj')
     ]);
 
-    return await Promise.all([
-        cubeMeshResponse.text(),
-        sphereMeshResponse.text(),
-        spaceshipMeshResponse.text()
-    ]);
+    return await Promise.all(meshResponses.map(meshResponce => meshResponce.text()));
 }
 
 export async function getResources(): Promise<[string[], HTMLImageElement[], string[]]> {
