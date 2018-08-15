@@ -1,6 +1,7 @@
 html, body {
     margin: 0;
     height: 100%;
+    font-size: 16px;
 }
 
 canvas {
@@ -21,4 +22,8 @@ canvas {
 
 #ui-panel > span {
     display: block;
+}
+
+.view-mode {
+    font-weight: bold;
 }

@@ -1,5 +1,5 @@
 import {mat4, vec3} from 'gl-matrix';
-import {outVec3, sin, cos, clamp, toRadians, toDegrees, asin, atan} from './math';
+import {outVec3, sin, cos, clamp, toRadians} from './math';
 
 export interface Camera {
     position: vec3,
@@ -17,11 +17,18 @@ export interface Camera {
     rotate: (xOffset: number, yOffset: number) => void
 }
 
+function calculateDirectionFromAngles(direction: vec3, pitch: number, yaw: number) {
+    direction[0] = cos(toRadians(yaw)) * cos(toRadians(pitch));
+    direction[1] = sin(toRadians(pitch));
+    direction[2] = sin(toRadians(yaw)) * cos(toRadians(pitch));
+    vec3.normalize(direction, direction);
+}
+
 export function createCamera(position: vec3 = vec3.fromValues(0, 1, 3),
-                             direction: vec3 = vec3.fromValues(0, 0, -1),
+                             pitch: number, yaw: number,
                              up: vec3 = vec3.fromValues(0, 1, 0)): Camera {
-    const pitch = toDegrees(asin(direction[1]));
-    const yaw = toDegrees(atan(direction[2] / direction[0]));
+    const direction = vec3.create();
+    calculateDirectionFromAngles(direction, pitch, yaw);
 
     return {
         position,
@@ -69,10 +76,7 @@ export function createCamera(position: vec3 = vec3.fromValues(0, 1, 3),
 
             this.pitch = clamp(this.pitch, -89, 89);
 
-            outVec3[0] = cos(toRadians(this.yaw)) * cos(toRadians(this.pitch));
-            outVec3[1] = sin(toRadians(this.pitch));
-            outVec3[2] = sin(toRadians(this.yaw)) * cos(toRadians(this.pitch));
-            vec3.normalize(this.direction, outVec3);
+            calculateDirectionFromAngles(this.direction, this.pitch, this.yaw);
         }
     };
 }

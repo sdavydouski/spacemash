@@ -54,15 +54,20 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/none_specular_map.jpg'),
         loadTexture('/textures/flat_normal_map.jpg'),
 
-        loadTexture('/textures/space_ship_test_color.png')
+        loadTexture('/textures/predator_diffuse_map.png'),
+        loadTexture('/textures/predator_specular_map.png'),
+
+        loadTexture('/textures/fighter.jpg')
     ]);
 }
 
+// https://www.cgtrader.com/free-3d-models/space/spaceship/spaceships-pack
 async function getModels(): Promise<string[]> {
     const meshResponses = await Promise.all([
         fetch('/models/cube/cube.obj'),
         fetch('/models/sphere/sphere.obj'),
-        fetch('/models/spaceship/spaceship.obj')
+        fetch('/models/spaceship/predator.obj'),
+        fetch('/models/spaceship/fighter.obj')
     ]);
 
     return await Promise.all(meshResponses.map(meshResponce => meshResponce.text()));
