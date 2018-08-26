@@ -7,7 +7,7 @@ import {
     setUniform1f, setUniform1i, setUniform3fv,
     setUniformMatrix4fv
 } from './shaders';
-import {clamp, cos, outVec3, sin, toRadians} from './math';
+import {clamp, cos, outVec3, sin, toDegrees, toRadians} from './math';
 import {createCamera} from './camera';
 import {updateUI} from './ui';
 import {createSkymap, createTexture, createTextureWithDimensions} from './textures';
@@ -30,7 +30,7 @@ interface Player {
 }
 
 getResources().then(([[
-    gridVertexShaderSource, gridFragmentShaderSource,
+    axisVertexShaderSource, axisFragmentShaderSource,
     generalVertexShaderSource, generalFragmentShaderSource,
     skymapVertexShaderSource, skymapFragmentShaderSource,
     lightVertexShaderSource, lightFragmentShaderSource,
@@ -42,18 +42,18 @@ getResources().then(([[
     sunImage, mercuryDiffuseMapImage, mercuryNormalMapImage, venusDiffuseMapImage, venusNormalMapImage,
     earthDayDiffuseMapImage, earthSpecularMapImage, earthNormalMapImage,
     marsDiffuseMapImage, marsNormalMapImage, diffuseImage, specularImage, noneSpecularImage, flatNormalImage,
-    predatorDiffuseMapImage, predatorSpecularMapImage, fighterImage
+    predatorDiffuseMapImage, predatorSpecularMapImage, fighterImage, missileImage
 ], [
-    cubeMesh, sphereMesh, predatorMesh, fighterMesh
+    cubeMesh, sphereMesh, predatorMesh, fighterMesh, missileMesh
 ]]) => {
     const player: Player = {
-        position: vec3.fromValues(0, 0, 200),
+        position: vec3.fromValues(0, -300, 0),
         velocity: 0,
         acceleration: 0,
         rotation: 0
     };
 
-    const baselineY = -100;
+    const baselineZ = -100;
 
     const canvas = <HTMLCanvasElement>document.getElementById('game-surface');
     const gl = getContext(canvas);
@@ -79,8 +79,8 @@ getResources().then(([[
 
     const transformationsBindingIndex = 0;
 
-    const gridShader = createProgram(gl, gridVertexShaderSource, gridFragmentShaderSource);
-    bindUniformBlock(gl, gridShader.program, 'transformations', transformationsBindingIndex);
+    const axisShader = createProgram(gl, axisVertexShaderSource, axisFragmentShaderSource);
+    bindUniformBlock(gl, axisShader.program, 'transformations', transformationsBindingIndex);
 
     const generalShader = createProgram(gl, generalVertexShaderSource, generalFragmentShaderSource);
     bindUniformBlock(gl, generalShader.program, 'transformations', transformationsBindingIndex);
@@ -99,7 +99,7 @@ getResources().then(([[
     bindUniformBlock(gl, lightingShader.program, 'transformations', transformationsBindingIndex);
     gl.useProgram(lightingShader.program);
     const lightingModel = mat4.create();
-    const lightPosition = vec3.fromValues(0, baselineY, 0);
+    const lightPosition = vec3.fromValues(0, 0, baselineZ);
     setUniform3fv(gl, lightingShader.uniforms['uLightPosition'], lightPosition);
     setUniform1i(gl, lightingShader.uniforms['material.diffuse'], 0);
     setUniform1i(gl, lightingShader.uniforms['material.specular'], 1);
@@ -128,34 +128,26 @@ getResources().then(([[
     gl.bindBufferRange(gl.UNIFORM_BUFFER, transformationsBindingIndex, UBO, 0, projection.byteLength + view.byteLength);
     gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
-    const camera = createCamera(vec3.fromValues(player.position[0], 400, player.position[2] + 200), -60, -90);
+    const camera = createCamera(vec3.fromValues(player.position[0], player.position[1] - 200, 400), -60, 90);
 
     // grid setup {
     const HALF_WORLD_SIZE = 2000;
     const LINES_PER_AXIS = 22;
     const offset = 2 * HALF_WORLD_SIZE / (LINES_PER_AXIS - 1);
+    const gridColor = [0.3, 0.3, 0.3];
 
-    const grid = new Float32Array(2 * LINES_PER_AXIS * 2 * 3);
+    const gridArray: number[] = [];
 
-    let index = 0;
     for (let x = -HALF_WORLD_SIZE; x <= HALF_WORLD_SIZE; x += offset) {
-        grid[index++] = x;
-        grid[index++] = 0;
-        grid[index++] = -HALF_WORLD_SIZE;
-
-        grid[index++] = x;
-        grid[index++] = 0;
-        grid[index++] = HALF_WORLD_SIZE;
+        gridArray.push(x, -HALF_WORLD_SIZE, 0, ...gridColor);
+        gridArray.push(x, HALF_WORLD_SIZE, 0, ...gridColor);
     }
-    for (let z = -HALF_WORLD_SIZE; z <= HALF_WORLD_SIZE; z += offset) {
-        grid[index++] = -HALF_WORLD_SIZE;
-        grid[index++] = 0;
-        grid[index++] = z;
-
-        grid[index++] = HALF_WORLD_SIZE;
-        grid[index++] = 0;
-        grid[index++] = z;
+    for (let y = -HALF_WORLD_SIZE; y <= HALF_WORLD_SIZE; y += offset) {
+        gridArray.push(-HALF_WORLD_SIZE, y, 0, ...gridColor);
+        gridArray.push(HALF_WORLD_SIZE, y, 0, ...gridColor);
     }
+
+    const grid = new Float32Array(gridArray);
 
     const gridVAO = gl.createVertexArray();
     gl.bindVertexArray(gridVAO);
@@ -165,8 +157,39 @@ getResources().then(([[
     gl.bufferData(gl.ARRAY_BUFFER, grid, gl.STATIC_DRAW);
 
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,0, 0);
-    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,6 * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false,
+        6 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+    // }
+
+    // axis setup {
+    const axis = new Float32Array([
+        // x-axis - red
+        -HALF_WORLD_SIZE, 0, 0,   1, 0, 0,
+        HALF_WORLD_SIZE, 0, 0,    1, 0, 0,
+        // y-axis - green
+        0, -HALF_WORLD_SIZE, 0,   0, 1, 0,
+        0, HALF_WORLD_SIZE, 0,    0, 1, 0,
+        // z-axis - blue
+        0, 0, -HALF_WORLD_SIZE,   0, 0, 1,
+        0, 0, HALF_WORLD_SIZE,    0, 0, 1
+    ]);
+
+    const axisVAO = gl.createVertexArray();
+    gl.bindVertexArray(axisVAO);
+
+    const axisVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, axisVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, axis, gl.STATIC_DRAW);
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,6 * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false,
+        6 * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
     // }
 
     // quad setup {
@@ -323,6 +346,37 @@ getResources().then(([[
         numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 11 * Float32Array.BYTES_PER_ELEMENT);
     // }
 
+    // missile setup {
+    const missile = parseObj(missileMesh);
+
+    const missileVAO = gl.createVertexArray();
+    gl.bindVertexArray(missileVAO);
+
+    const missileVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, missileVBO);
+    gl.bufferData(gl.ARRAY_BUFFER, missile, gl.STATIC_DRAW);
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 2, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 5 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 8 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 3, gl.FLOAT, false,
+        numbersPerVertex * Float32Array.BYTES_PER_ELEMENT, 11 * Float32Array.BYTES_PER_ELEMENT);
+    // }
+
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
     const noneSpecularTexture = createTexture(gl, noneSpecularImage, gl.RGB, gl.RGB);
@@ -343,6 +397,7 @@ getResources().then(([[
     const predatorDiffuseMapTexture = createTexture(gl, predatorDiffuseMapImage);
     const predatorSpecularMapTexture = createTexture(gl, predatorSpecularMapImage);
     const fighterTexture = createTexture(gl, fighterImage, gl.RGB, gl.RGB);
+    const missileTexture = createTexture(gl, missileImage, gl.RGBA, gl.RGBA);
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
@@ -492,14 +547,14 @@ getResources().then(([[
                 camera.strafeRight(speed);
             }
         } else {
-            const acceleration = 7;
+            const acceleration = 4;
             const rotation = 0.03;
 
             if (pressedKeys.w) {
-                player.acceleration = acceleration;
+                player.acceleration = -acceleration;
             }
             if (pressedKeys.s) {
-                player.acceleration = -acceleration;
+                player.acceleration = acceleration;
             }
             if (pressedKeys.a) {
                 player.rotation += rotation;
@@ -508,6 +563,9 @@ getResources().then(([[
             if (pressedKeys.d) {
                 player.rotation -= rotation;
                 player.rotation %= 2 * Math.PI;
+            }
+            if (pressedKeys.shift) {
+                player.acceleration *= 2;
             }
         }
 
@@ -519,22 +577,14 @@ getResources().then(([[
 
     function update(dt: number) {
         // friction imitation
-        // bob.acceleration.x += -0.5f * bob.velocity.x;
-        // bob.velocity.x += bob.acceleration.x * dt;
-        //
-        // bob.acceleration.y += -0.01f * bob.velocity.y;
-        // bob.velocity.y += bob.acceleration.y * dt;
-        //
-        // vec2 move = 0.5f * bob.acceleration * dt * dt + bob.velocity * dt;
-
-        player.acceleration += -0.5 * player.velocity;
+        player.acceleration += -0.25 * player.velocity;
         player.velocity += player.acceleration * dt;
 
-        // we move in xz plane
+        // we move in xy plane
         const move = vec3.fromValues(
-            (0.5 * player.acceleration * dt * dt + player.velocity * dt) * cos(Math.PI - player.rotation),
-            0,
-            (0.5 * player.acceleration * dt * dt + player.velocity * dt) * sin(Math.PI - player.rotation)
+            (player.velocity * dt + 0.5 * player.acceleration * dt * dt) * sin(Math.PI - player.rotation),
+            (player.velocity * dt + 0.5 * player.acceleration * dt * dt) * cos(Math.PI - player.rotation),
+            0
         );
 
         vec3.add(player.position, player.position, move);
@@ -555,9 +605,11 @@ getResources().then(([[
         gl.bufferSubData(gl.UNIFORM_BUFFER, projection.byteLength, view);
         gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
-        // gl.bindVertexArray(gridVAO);
-        // gl.useProgram(gridShader.program);
-        // gl.drawArrays(gl.LINES, 0, grid.length / 3);
+        gl.useProgram(axisShader.program);
+        gl.bindVertexArray(gridVAO);
+        gl.drawArrays(gl.LINES, 0, grid.length / 6);
+        gl.bindVertexArray(axisVAO);
+        gl.drawArrays(gl.LINES, 0, axis.length / 6);
 
         angle += toRadians(delta);
         angle %= 2 * Math.PI;
@@ -574,7 +626,8 @@ getResources().then(([[
         gl.bindTexture(gl.TEXTURE_2D, sunTexture);
         mat4.identity(lightModel);
         mat4.translate(lightModel, lightModel, lightPosition);
-        mat4.rotateY(lightModel, lightModel, angle * 10);
+        mat4.rotateZ(lightModel, lightModel, angle * 10);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
         mat4.scale(lightModel, lightModel, [10, 10, 10]);
         setUniformMatrix4fv(gl, lightShader.uniforms['model'], lightModel);
         gl.drawArrays(gl.TRIANGLES, 0, sphere.length / numbersPerVertex);
@@ -589,8 +642,9 @@ getResources().then(([[
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, mercuryNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [-200, baselineY, 0]);
-        mat4.rotateY(lightingModel, lightingModel, angle * 50);
+        mat4.translate(lightingModel, lightingModel, [0, 200, baselineZ]);
+        mat4.rotateZ(lightingModel, lightingModel, angle * 50);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
         mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
         setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
         setUniform1f(gl, lightingShader.uniforms['material.shininess'], 1);
@@ -605,8 +659,9 @@ getResources().then(([[
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, venusNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [-500, baselineY, 0]);
-        mat4.rotateY(lightingModel, lightingModel, angle * 50);
+        mat4.translate(lightingModel, lightingModel, [0, 500, baselineZ]);
+        mat4.rotateZ(lightingModel, lightingModel, angle * 50);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
         mat4.scale(lightingModel, lightingModel, [3, 3, 3]);
         setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
         setUniform1f(gl, lightingShader.uniforms['material.shininess'], 2);
@@ -621,8 +676,9 @@ getResources().then(([[
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, earthNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [ -800, baselineY, 0]);
-        mat4.rotateY(lightingModel, lightingModel, angle * 20);
+        mat4.translate(lightingModel, lightingModel, [0, 800, baselineZ]);
+        mat4.rotateZ(lightingModel, lightingModel, angle * 20);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
         mat4.scale(lightingModel, lightingModel, [4, 4, 4]);
         setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
         setUniform1f(gl, lightingShader.uniforms['material.shininess'], 16);
@@ -637,8 +693,9 @@ getResources().then(([[
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, marsNormalMapTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [-1200, baselineY, 0]);
-        mat4.rotateY(lightingModel, lightingModel, angle * 50);
+        mat4.translate(lightingModel, lightingModel, [0, 1200, baselineZ]);
+        mat4.rotateZ(lightingModel, lightingModel, angle * 50);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
         mat4.scale(lightingModel, lightingModel, [4, 4, 4]);
         setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
         setUniform1f(gl, lightingShader.uniforms['material.shininess'], 16);
@@ -673,11 +730,12 @@ getResources().then(([[
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
         mat4.identity(lightingModel);
-        mat4.translate(lightingModel, lightingModel, [-150, 0, -50]);
+        mat4.translate(lightingModel, lightingModel, [-200, 200, 0]);
         // mat4.rotateX(lightingModel, lightingModel, angle * 10);
-        mat4.rotateY(lightingModel, lightingModel, angle * 20);
+        mat4.rotateZ(lightingModel, lightingModel, angle * 20);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
         // mat4.rotateZ(lightingModel, lightingModel, angle * 30);
-        mat4.scale(lightingModel, lightingModel, [1, 1, 1]);
+        mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
         setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
         setUniform1f(gl, lightingShader.uniforms['material.shininess'], 256);
         setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(1, 1, 1));
@@ -693,12 +751,31 @@ getResources().then(([[
         gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
         mat4.identity(lightingModel);
         mat4.translate(lightingModel, lightingModel, player.position);
-        mat4.rotateY(lightingModel, lightingModel, player.rotation);
-        mat4.scale(lightingModel, lightingModel, [1, 1, 1]);
+        mat4.rotateZ(lightingModel, lightingModel, player.rotation);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
+        mat4.scale(lightingModel, lightingModel, [2, 2, 2]);
         setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
         setUniform1f(gl, lightingShader.uniforms['material.shininess'], 64);
         setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(1, 1, 1));
         gl.drawArrays(gl.TRIANGLES, 0, fighter.length / numbersPerVertex);
+
+        // missile
+        gl.bindVertexArray(missileVAO);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, missileTexture);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, noneSpecularTexture);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, flatNormalTexture);
+        mat4.identity(lightingModel);
+        mat4.translate(lightingModel, lightingModel, [100, 100, 200]);
+        mat4.rotateY(lightingModel, lightingModel, angle * 100);
+        mat4.rotateX(lightingModel, lightingModel, toRadians(90));
+        mat4.scale(lightingModel, lightingModel, [1, 1, 1]);
+        setUniformMatrix4fv(gl, lightingShader.uniforms['model'], lightingModel);
+        setUniform1f(gl, lightingShader.uniforms['material.shininess'], 64);
+        setUniform3fv(gl, lightingShader.uniforms['light.specular'], vec3.fromValues(1, 1, 1));
+        gl.drawArrays(gl.TRIANGLES, 0, missile.length / numbersPerVertex);
 
         // motivation
         gl.useProgram(generalShader.program);
@@ -711,7 +788,8 @@ getResources().then(([[
 
         gl.bindVertexArray(quadVAO);
         mat4.identity(generalModel);
-        mat4.translate(generalModel, generalModel, [0, 500, -2000]);
+        mat4.translate(generalModel, generalModel, [0, -2000, 0]);
+        mat4.rotateX(generalModel, generalModel, toRadians(90));
         mat4.scale(generalModel, generalModel, [1000, 500, 500]);
         setUniformMatrix4fv(gl, generalShader.uniforms['model'], generalModel);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -791,12 +869,14 @@ getResources().then(([[
     }
 
     function onKeyDown(e: KeyboardEvent) {
-        pressedKeys[e.key] = true;
+        const key = e.key.toLowerCase();
+        pressedKeys[key] = true;
     }
 
     function onKeyUp(e: KeyboardEvent) {
-        pressedKeys[e.key] = false;
-        processedKeys[e.key] = false;
+        const key = e.key.toLowerCase();
+        pressedKeys[key] = false;
+        processedKeys[key] = false;
     }
 
     const zoomSensitivity = 0.01;

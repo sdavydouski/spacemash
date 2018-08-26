@@ -19,14 +19,14 @@ export interface Camera {
 
 function calculateDirectionFromAngles(direction: vec3, pitch: number, yaw: number) {
     direction[0] = cos(toRadians(yaw)) * cos(toRadians(pitch));
-    direction[1] = sin(toRadians(pitch));
-    direction[2] = sin(toRadians(yaw)) * cos(toRadians(pitch));
+    direction[2] = sin(toRadians(pitch));
+    direction[1] = sin(toRadians(yaw)) * cos(toRadians(pitch));
     vec3.normalize(direction, direction);
 }
 
-export function createCamera(position: vec3 = vec3.fromValues(0, 1, 3),
+export function createCamera(position: vec3 = vec3.fromValues(0, 0, 0),
                              pitch: number, yaw: number,
-                             up: vec3 = vec3.fromValues(0, 1, 0)): Camera {
+                             up: vec3 = vec3.fromValues(0, 0, 1)): Camera {
     const direction = vec3.create();
     calculateDirectionFromAngles(direction, pitch, yaw);
 
@@ -71,7 +71,7 @@ export function createCamera(position: vec3 = vec3.fromValues(0, 1, 3),
         },
 
         rotate(xOffset: number, yOffset: number) {
-            this.yaw += xOffset;
+            this.yaw -= xOffset;
             this.pitch += yOffset;
 
             this.pitch = clamp(this.pitch, -89, 89);

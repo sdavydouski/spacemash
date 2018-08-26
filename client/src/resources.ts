@@ -1,7 +1,7 @@
 async function getShaders(): Promise<string[]> {
     const shaderResponses = await Promise.all([
-        fetch('/shaders/grid/grid.vert'),
-        fetch('/shaders/grid/grid.frag'),
+        fetch('/shaders/axis/axis.vert'),
+        fetch('/shaders/axis/axis.frag'),
         fetch('/shaders/general/general.vert'),
         fetch('/shaders/general/general.frag'),
         fetch('/shaders/skymap/skymap.vert'),
@@ -57,7 +57,8 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/predator_diffuse_map.png'),
         loadTexture('/textures/predator_specular_map.png'),
 
-        loadTexture('/textures/fighter.jpg')
+        loadTexture('/textures/fighter.jpg'),
+        loadTexture('/textures/missile.png')
     ]);
 }
 
@@ -67,7 +68,8 @@ async function getModels(): Promise<string[]> {
         fetch('/models/cube/cube.obj'),
         fetch('/models/sphere/sphere.obj'),
         fetch('/models/spaceship/predator.obj'),
-        fetch('/models/spaceship/fighter.obj')
+        fetch('/models/spaceship/fighter.obj'),
+        fetch('/models/missiles/missile.obj')
     ]);
 
     return await Promise.all(meshResponses.map(meshResponce => meshResponce.text()));
