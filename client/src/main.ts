@@ -29,6 +29,12 @@ interface Player {
     rotation: number
 }
 
+interface Particle {
+    position: vec3,
+    velocity: vec3,
+    lifespan: number
+}
+
 getResources().then(([[
     axisVertexShaderSource, axisFragmentShaderSource,
     generalVertexShaderSource, generalFragmentShaderSource,
@@ -36,13 +42,14 @@ getResources().then(([[
     lightVertexShaderSource, lightFragmentShaderSource,
     lightingVertexShaderSource, lightingFragmentShaderSource,
     blurVertexShaderSource, blurHorizontalFragmentShaderSource, blurVerticalFragmentShaderSource,
-    finalVertexShaderSource, finalFragmentShaderSource
+    finalVertexShaderSource, finalFragmentShaderSource,
+    transformFeedbackVertexShaderSource, transformFeedbackFragmentShaderSource
 ], [
     bluespaceBackImage, bluespaceBottomImage, bluespaceFrontImage, bluespaceLeftImage, bluespaceRightImage, bluespaceTopImage,
     sunImage, mercuryDiffuseMapImage, mercuryNormalMapImage, venusDiffuseMapImage, venusNormalMapImage,
     earthDayDiffuseMapImage, earthSpecularMapImage, earthNormalMapImage,
     marsDiffuseMapImage, marsNormalMapImage, diffuseImage, specularImage, noneSpecularImage, flatNormalImage,
-    predatorDiffuseMapImage, predatorSpecularMapImage, fighterImage, missileImage
+    predatorDiffuseMapImage, predatorSpecularMapImage, fighterImage, missileImage, particleImage
 ], [
     cubeMesh, sphereMesh, predatorMesh, fighterMesh, missileMesh
 ]]) => {
@@ -117,6 +124,13 @@ getResources().then(([[
     gl.useProgram(finalShader.program);
     setUniform1i(gl, finalShader.uniforms['scene'], 0);
     setUniform1i(gl, finalShader.uniforms['bloomBlur'], 1);
+
+    const transformFeedback = createProgram(gl,
+        transformFeedbackVertexShaderSource, transformFeedbackFragmentShaderSource,
+        ['out_position', 'out_velocity', 'out_lifespan'], gl.INTERLEAVED_ATTRIBS);
+    bindUniformBlock(gl, transformFeedback.program, 'transformations', transformationsBindingIndex);
+    gl.useProgram(transformFeedback.program);
+    setUniform1i(gl, transformFeedback.uniforms['particleTexture'], 0);
 
     const projection = mat4.create();
     const view = mat4.create();
@@ -399,6 +413,8 @@ getResources().then(([[
     const fighterTexture = createTexture(gl, fighterImage, gl.RGB, gl.RGB);
     const missileTexture = createTexture(gl, missileImage, gl.RGBA, gl.RGBA);
 
+    const particleTexture = createTexture(gl, particleImage, gl.RGBA, gl.RGBA);
+
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 
     const bluespaceSkymapTexture = createSkymap(gl, gl.RGB, {
@@ -501,13 +517,67 @@ getResources().then(([[
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
+    const PARTICLES_COUNT = 100000;
+    // vec3, vec3, float
+    const sizeOfParticle = 3 + 3 + 1;
+
+    const particles = new Float32Array(sizeOfParticle * PARTICLES_COUNT);
+
+    let feedback1VAO = gl.createVertexArray();
+    gl.bindVertexArray(feedback1VAO);
+
+    let feedback1VBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, feedback1VBO);
+    gl.bufferData(gl.ARRAY_BUFFER, particles, gl.STREAM_COPY);
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
+        sizeOfParticle * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false,
+        sizeOfParticle * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false,
+        sizeOfParticle * Float32Array.BYTES_PER_ELEMENT, 6 * Float32Array.BYTES_PER_ELEMENT);
+
+    let feedback2VAO = gl.createVertexArray();
+    gl.bindVertexArray(feedback2VAO);
+
+    let feedback2VBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, feedback2VBO);
+    gl.bufferData(gl.ARRAY_BUFFER, particles.length * Float32Array.BYTES_PER_ELEMENT, gl.STREAM_COPY);
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false,
+        sizeOfParticle * Float32Array.BYTES_PER_ELEMENT, 0);
+
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 3, gl.FLOAT, false,
+        sizeOfParticle * Float32Array.BYTES_PER_ELEMENT, 3 * Float32Array.BYTES_PER_ELEMENT);
+
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false,
+        sizeOfParticle * Float32Array.BYTES_PER_ELEMENT, 6 * Float32Array.BYTES_PER_ELEMENT);
+
+    const feedback = gl.createTransformFeedback();
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, feedback);
+
+    let currentInFeedbackVAO = feedback1VAO;
+    let currentInFeedbackVBO = feedback1VBO;
+
+    let currentOutFeedbackVAO = feedback2VAO;
+    let currentOutFeedbackVBO = feedback2VBO;
+
+    let currentTime = performance.now();
     let lastTime = 0;
     let updateRate = 0.01;      // 10 ms
     let lag = 0;
 
     let angle = 0;
     function gameLoop() {
-        const currentTime = performance.now();
+        currentTime = performance.now();
         const delta = (currentTime - lastTime) / 1000;
         lastTime = currentTime;
 
@@ -801,6 +871,33 @@ getResources().then(([[
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, bluespaceSkymapTexture);
         gl.drawArrays(gl.TRIANGLES, 0, 36);
         gl.depthFunc(gl.LESS);
+
+        // particles
+        gl.useProgram(transformFeedback.program);
+        setUniform1f(gl, transformFeedback.uniforms['u_time'], currentTime);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, particleTexture);
+
+        gl.bindVertexArray(currentInFeedbackVAO);
+        gl.bindBuffer(gl.ARRAY_BUFFER, currentInFeedbackVBO);
+        gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, currentOutFeedbackVBO);
+
+        gl.beginTransformFeedback(gl.POINTS);
+        gl.disable(gl.DEPTH_TEST);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        gl.drawArrays(gl.POINTS, 0, particles.length / sizeOfParticle);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.enable(gl.DEPTH_TEST);
+        gl.endTransformFeedback();
+
+        // swapping the buffers
+        let temp = currentInFeedbackVAO;
+        currentInFeedbackVAO = currentOutFeedbackVAO;
+        currentOutFeedbackVAO = temp;
+
+        temp = currentInFeedbackVBO;
+        currentInFeedbackVBO = currentOutFeedbackVBO;
+        currentOutFeedbackVBO = temp;
 
         // blurring
         gl.viewport(0, 0, blurRegionWidth, blurRegionHeight);

@@ -17,10 +17,17 @@ function _createShader(gl: WebGL2RenderingContext, source: string, type: number)
 
 function _createProgram(gl: WebGL2RenderingContext,
                         vertexShader: WebGLShader,
-                        fragmentShader: WebGLShader): WebGLProgram {
+                        fragmentShader: WebGLShader,
+                        feedbackVaryings?: string[],
+                        feedbackBufferMode?: number): WebGLProgram {
     const shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vertexShader);
     gl.attachShader(shaderProgram, fragmentShader);
+
+    if (feedbackVaryings) {
+        gl.transformFeedbackVaryings(shaderProgram, feedbackVaryings, feedbackBufferMode);
+    }
+
     gl.linkProgram(shaderProgram);
 
     if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
@@ -51,10 +58,12 @@ interface ShaderUniforms {
 
 export function createProgram(gl: WebGL2RenderingContext,
                               vertexShaderSource: string,
-                              fragmentShaderSource: string): ShaderProgram {
+                              fragmentShaderSource: string,
+                              feedbackVaryings?: string[],
+                              feedbackBufferMode?: number): ShaderProgram {
     const vertexShader = _createShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
     const fragmentShader = _createShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
-    const program = _createProgram(gl, vertexShader, fragmentShader);
+    const program = _createProgram(gl, vertexShader, fragmentShader, feedbackVaryings, feedbackBufferMode);
 
     const uniformsCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
     const uniforms: ShaderUniforms = {};

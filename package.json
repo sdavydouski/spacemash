@@ -4,11 +4,15 @@
   "description": "Multiplayer space warfare browser 3D game",
   "scripts": {
     "client-watch": "cd client&&webpack --watch",
-    "start-server": "cd server&&node main.js"
+    "start-server": "cd server&&tsc&&node dist/main.js"
   },
   "author": "wiranoid",
   "devDependencies": {
     "@types/gl-matrix": "^2.4.0",
+    "@types/koa": "^2.0.46",
+    "@types/koa-send": "^4.1.1",
+    "@types/koa-static": "^4.0.0",
+    "@types/node": "^10.9.4",
     "@types/webgl2": "0.0.4",
     "ts-loader": "^4.4.2",
     "typescript": "^2.9.2",

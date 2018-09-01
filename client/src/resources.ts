@@ -14,7 +14,9 @@ async function getShaders(): Promise<string[]> {
         fetch('/shaders/blur/blur_horizontal.frag'),
         fetch('/shaders/blur/blur_vertical.frag'),
         fetch('/shaders/final/final.vert'),
-        fetch('/shaders/final/final.frag')
+        fetch('/shaders/final/final.frag'),
+        fetch('/shaders/transformFeedback/transformFeedback.vert'),
+        fetch('/shaders/transformFeedback/transformFeedback.frag')
     ]);
 
     return await Promise.all(shaderResponses.map(shaderResponse => shaderResponse.text()));
@@ -58,7 +60,9 @@ async function getTextures(): Promise<HTMLImageElement[]> {
         loadTexture('/textures/predator_specular_map.png'),
 
         loadTexture('/textures/fighter.jpg'),
-        loadTexture('/textures/missile.png')
+        loadTexture('/textures/missile.png'),
+
+        loadTexture('/textures/spark.png')
     ]);
 }
 
